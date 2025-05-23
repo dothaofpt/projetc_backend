@@ -1,0 +1,41 @@
+# Project-specific files
+.env
+!.env.example
+*.log
+*.bak
+*.tmp
+
+# Maven
+target/
+*.jar
+!projetc_backend-0.0.1-SNAPSHOT.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# IDE - Eclipse/STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# IDE - NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# IDE - VS Code
+.vscode/
+
+# Documentation (uncomment if you want to include HELP.md)
+# HELP.md
