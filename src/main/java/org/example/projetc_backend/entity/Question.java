@@ -15,14 +15,14 @@ public class Question {
     @JoinColumn(name = "quiz_id", nullable = false)
     private Quiz quiz;
 
-    @Column(name = "question_text", nullable = false)
-    private String questionText;
+    @Column(name = "question_text")
+    private String questionText = "";
 
-    @Column(nullable = false)
+    @Column
     @Enumerated(EnumType.STRING)
-    private QuestionType type;
+    private QuestionType type = QuestionType.MULTIPLE_CHOICE;
 
     public enum QuestionType {
-        multiple_choice, fill_in_the_blank
+        MULTIPLE_CHOICE, FILL_IN_THE_BLANK, LISTENING_COMPREHENSION, SPEAKING_PRONUNCIATION, READING_COMPREHENSION, WRITING_ESSAY
     }
 }

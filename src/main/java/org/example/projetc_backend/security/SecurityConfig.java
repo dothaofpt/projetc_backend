@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -19,6 +20,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -35,7 +37,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/**").permitAll()
-                        .anyRequest().permitAll() // Tạm thời cho dev, đổi thành .authenticated() sau
+                        .requestMatchers("/api/lessons/**", "/api/vocabulary/**", "/api/quizzes/**",
+                                "/api/questions/**", "/api/answers/**", "/api/learning-materials/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/progress/**", "/api/quiz-results/**", "/api/user-flashcards/**")
+                        .hasAnyRole("ADMIN", "USER")
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -55,15 +62,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Chỉ định rõ nguồn gốc thay vì "*"
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:8000",  // Flutter Web (cổng mặc định)
-                "http://localhost:8080",  // Backend
-                "http://localhost:61299"  // Cổng Flutter Web bạn thấy trong log
+                "http://localhost:8000",
+                "http://localhost:8080",
+                "http://localhost:61299"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
-        configuration.setAllowCredentials(true); // Giữ nguyên để hỗ trợ cookie/token
+        configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

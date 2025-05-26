@@ -1,12 +1,13 @@
 package org.example.projetc_backend.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import java.time.LocalDateTime;
 
 public record ProgressResponse(
         Integer progressId,
         Integer userId,
         Integer lessonId,
+        String skill,
         String status,
-        String lastUpdated
+        Integer completionPercentage,
+        LocalDateTime lastUpdated
 ) {}

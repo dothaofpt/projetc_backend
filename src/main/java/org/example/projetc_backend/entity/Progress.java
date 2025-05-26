@@ -20,14 +20,25 @@ public class Progress {
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
-    @Column(nullable = false)
+    @Column
     @Enumerated(EnumType.STRING)
-    private Status status;
+    private Skill skill = Skill.VOCABULARY;
+
+    @Column
+    @Enumerated(EnumType.STRING)
+    private Status status = Status.IN_PROGRESS;
+
+    @Column(name = "completion_percentage")
+    private Integer completionPercentage = 0;
 
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated = LocalDateTime.now();
 
+    public enum Skill {
+        LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR
+    }
+
     public enum Status {
-        not_started, in_progress, completed
+        NOT_STARTED, IN_PROGRESS, COMPLETED
     }
 }

@@ -9,6 +9,7 @@ public record FlashcardResponse(
         String exampleSentence,
         String pronunciation,
         String audioUrl,
+        String writingPrompt,
         String difficultyLevel,
         boolean isKnown
 ) {
@@ -20,7 +21,8 @@ public record FlashcardResponse(
                 vocabulary.getExampleSentence() != null ? vocabulary.getExampleSentence() : "",
                 vocabulary.getPronunciation() != null ? vocabulary.getPronunciation() : "",
                 vocabulary.getAudioUrl() != null ? vocabulary.getAudioUrl() : "",
-                vocabulary.getDifficultyLevel() != null ? vocabulary.getDifficultyLevel() : "EASY",
+                vocabulary.getWritingPrompt() != null ? vocabulary.getWritingPrompt() : "",
+                vocabulary.getDifficultyLevel() != null ? vocabulary.getDifficultyLevel().toString() : "EASY",
                 isKnown
         );
     }

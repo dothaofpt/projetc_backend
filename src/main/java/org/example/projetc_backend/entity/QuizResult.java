@@ -20,8 +20,8 @@ public class QuizResult {
     @JoinColumn(name = "quiz_id", nullable = false)
     private Quiz quiz;
 
-    @Column(nullable = false)
-    private Integer score;
+    @Column
+    private Integer score = 0;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt = LocalDateTime.now();

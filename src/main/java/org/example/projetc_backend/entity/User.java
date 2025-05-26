@@ -30,10 +30,17 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // Thêm trường cho OTP
     @Column(name = "otp_code", length = 6)
     private String otpCode;
 
     @Column(name = "otp_expiry")
     private LocalDateTime otpExpiry;
+
+    @Column(name = "role")
+    @Enumerated(EnumType.STRING)
+    private Role role = Role.ROLE_USER;
+
+    public enum Role {
+        ROLE_ADMIN, ROLE_USER
+    }
 }

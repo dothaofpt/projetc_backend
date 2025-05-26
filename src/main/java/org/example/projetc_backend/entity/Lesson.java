@@ -5,27 +5,52 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "Lessons")
+@Table(name = "lessons") // Chữ thường để khớp với chuẩn SQL
 @Data
 public class Lesson {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer lessonId;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 255, unique = true) // Thêm unique nếu cần
     private String title;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Level level;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Skill skill;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 
     public enum Level {
-        beginner, intermediate, advanced
+        BEGINNER, INTERMEDIATE, ADVANCED
+    }
+
+    public enum Skill {
+        LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR
+    }
+
+    // Constructors
+    public Lesson() {}
+
+    public Lesson(String title, String description, Level level, Skill skill) {
+        this.title = title;
+        this.description = description;
+        this.level = level;
+        this.skill = skill;
     }
 }

@@ -7,7 +7,6 @@ import lombok.Data;
 @Table(name = "UserFlashcards")
 @Data
 public class UserFlashcard {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
@@ -18,8 +17,8 @@ public class UserFlashcard {
     @Column(name = "word_id", nullable = false)
     private Integer wordId;
 
-    @Column(name = "is_known", nullable = false)
-    private boolean isKnown;
+    @Column(name = "is_known")
+    private boolean isKnown = false;
 
     public UserFlashcard() {}
 

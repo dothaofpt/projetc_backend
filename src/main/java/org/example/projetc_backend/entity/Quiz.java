@@ -16,9 +16,17 @@ public class Quiz {
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
-    @Column(nullable = false, length = 255)
-    private String title;
+    @Column(length = 255)
+    private String title = "";
+
+    @Column
+    @Enumerated(EnumType.STRING)
+    private Skill skill = Skill.VOCABULARY;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    public enum Skill {
+        LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR
+    }
 }

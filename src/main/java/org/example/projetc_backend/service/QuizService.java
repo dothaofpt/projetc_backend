@@ -23,39 +23,68 @@ public class QuizService {
     }
 
     public QuizResponse createQuiz(QuizRequest request) {
+        if (request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
+            throw new IllegalArgumentException("Request, lessonId, title, hoặc skill không được để trống");
+        }
         Lesson lesson = lessonRepository.findById(request.lessonId())
-                .orElseThrow(() -> new IllegalArgumentException("Lesson not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
+        quizRepository.findByTitle(request.title())
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException("Tiêu đề bài kiểm tra đã tồn tại: " + request.title());
+                });
         Quiz quiz = new Quiz();
         quiz.setLesson(lesson);
         quiz.setTitle(request.title());
+        quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
         quiz = quizRepository.save(quiz);
         return mapToQuizResponse(quiz);
     }
 
     public QuizResponse getQuizById(Integer quizId) {
+        if (quizId == null) {
+            throw new IllegalArgumentException("Quiz ID không được để trống");
+        }
         Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
         return mapToQuizResponse(quiz);
     }
 
     public List<QuizResponse> getQuizzesByLessonId(Integer lessonId) {
+        if (lessonId == null) {
+            throw new IllegalArgumentException("Lesson ID không được để trống");
+        }
         return quizRepository.findByLessonLessonId(lessonId).stream()
                 .map(this::mapToQuizResponse)
                 .collect(Collectors.toList());
     }
 
     public QuizResponse updateQuiz(Integer quizId, QuizRequest request) {
+        if (quizId == null || request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
+            throw new IllegalArgumentException("Quiz ID, request, lessonId, title, hoặc skill không được để trống");
+        }
         Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
         Lesson lesson = lessonRepository.findById(request.lessonId())
-                .orElseThrow(() -> new IllegalArgumentException("Lesson not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
+        quizRepository.findByTitle(request.title())
+                .filter(existing -> !existing.getQuizId().equals(quizId))
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException("Tiêu đề bài kiểm tra đã tồn tại: " + request.title());
+                });
         quiz.setLesson(lesson);
         quiz.setTitle(request.title());
+        quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
         quiz = quizRepository.save(quiz);
         return mapToQuizResponse(quiz);
     }
 
     public void deleteQuiz(Integer quizId) {
+        if (quizId == null) {
+            throw new IllegalArgumentException("Quiz ID không được để trống");
+        }
+        if (!quizRepository.existsById(quizId)) {
+            throw new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId);
+        }
         quizRepository.deleteById(quizId);
     }
 
@@ -64,7 +93,8 @@ public class QuizService {
                 quiz.getQuizId(),
                 quiz.getLesson().getLessonId(),
                 quiz.getTitle(),
-                quiz.getCreatedAt().toString()
+                quiz.getSkill().toString(),
+                quiz.getCreatedAt()
         );
     }
 }

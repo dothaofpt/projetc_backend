@@ -1,6 +1,8 @@
 package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.FlashcardResponse;
+import org.example.projetc_backend.dto.UserFlashcardRequest;
+import org.example.projetc_backend.dto.UserFlashcardResponse;
 import org.example.projetc_backend.entity.LessonVocabulary;
 import org.example.projetc_backend.entity.UserFlashcard;
 import org.example.projetc_backend.entity.Vocabulary;
@@ -19,25 +21,26 @@ public class FlashcardService {
     private final VocabularyRepository vocabularyRepository;
     private final UserFlashcardRepository userFlashcardRepository;
 
-    public FlashcardService(
-            LessonVocabularyRepository lessonVocabularyRepository,
-            VocabularyRepository vocabularyRepository,
-            UserFlashcardRepository userFlashcardRepository) {
+    public FlashcardService(LessonVocabularyRepository lessonVocabularyRepository,
+                            VocabularyRepository vocabularyRepository,
+                            UserFlashcardRepository userFlashcardRepository) {
         this.lessonVocabularyRepository = lessonVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.userFlashcardRepository = userFlashcardRepository;
     }
 
     public List<FlashcardResponse> getFlashcardsByLesson(Integer lessonId, Integer userId) {
+        if (lessonId == null || userId == null) {
+            throw new IllegalArgumentException("Lesson ID và User ID không được để trống");
+        }
         List<LessonVocabulary> lessonVocabularies = lessonVocabularyRepository.findByIdLessonId(lessonId);
         if (lessonVocabularies.isEmpty()) {
-            throw new IllegalArgumentException("No vocabulary found for this lesson");
+            throw new IllegalArgumentException("Không tìm thấy từ vựng cho bài học ID: " + lessonId);
         }
-
         return lessonVocabularies.stream()
                 .map(lv -> {
                     Vocabulary vocab = vocabularyRepository.findById(lv.getId().getWordId())
-                            .orElseThrow(() -> new IllegalArgumentException("Vocabulary not found"));
+                            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + lv.getId().getWordId()));
                     boolean isKnown = userFlashcardRepository
                             .findByUserIdAndWordId(userId, lv.getId().getWordId())
                             .map(UserFlashcard::isKnown)
@@ -47,15 +50,22 @@ public class FlashcardService {
                 .collect(Collectors.toList());
     }
 
-    public void markFlashcard(Integer userId, Integer wordId, boolean isKnown) {
-        vocabularyRepository.findById(wordId)
-                .orElseThrow(() -> new IllegalArgumentException("Word not found"));
-
+    public UserFlashcardResponse markFlashcard(UserFlashcardRequest request) {
+        if (request == null || request.userId() == null || request.wordId() == null) {
+            throw new IllegalArgumentException("User ID và Word ID không được để trống");
+        }
+        vocabularyRepository.findById(request.wordId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + request.wordId()));
         UserFlashcard flashcard = userFlashcardRepository
-                .findByUserIdAndWordId(userId, wordId)
-                .orElse(new UserFlashcard(userId, wordId, isKnown));
-
-        flashcard.setKnown(isKnown);
-        userFlashcardRepository.save(flashcard);
+                .findByUserIdAndWordId(request.userId(), request.wordId())
+                .orElse(new UserFlashcard(request.userId(), request.wordId(), request.isKnown()));
+        flashcard.setKnown(request.isKnown());
+        flashcard = userFlashcardRepository.save(flashcard);
+        return new UserFlashcardResponse(
+                flashcard.getId(),
+                flashcard.getUserId(),
+                flashcard.getWordId(),
+                flashcard.isKnown()
+        );
     }
 }

@@ -14,6 +14,9 @@ public class EmailService {
     }
 
     public void sendOtpEmail(String toEmail, String otp) {
+        if (toEmail == null || otp == null) {
+            throw new IllegalArgumentException("Email and OTP không được để trống");
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("Mã OTP để đặt lại mật khẩu");
