@@ -1,12 +1,16 @@
-package org.example.projetc_backend.service;
+package org.example.projetc_backend.service;// package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.LessonRequest;
 import org.example.projetc_backend.dto.LessonResponse;
 import org.example.projetc_backend.entity.Lesson;
 import org.example.projetc_backend.repository.LessonRepository;
 import org.springframework.stereotype.Service;
+import java.math.BigDecimal; // Import này là cần thiết
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -14,23 +18,32 @@ public class LessonService {
 
     private final LessonRepository lessonRepository;
 
+    private static final Map<Lesson.Level, Integer> LEVEL_DURATIONS = new HashMap<>();
+    static {
+        LEVEL_DURATIONS.put(Lesson.Level.BEGINNER, 6);
+        LEVEL_DURATIONS.put(Lesson.Level.INTERMEDIATE, 8);
+        LEVEL_DURATIONS.put(Lesson.Level.ADVANCED, 12);
+    }
+
     public LessonService(LessonRepository lessonRepository) {
         this.lessonRepository = lessonRepository;
     }
 
     public LessonResponse createLesson(LessonRequest request) {
-        if (request == null || request.title() == null || request.level() == null || request.skill() == null) {
-            throw new IllegalArgumentException("Request, title, level, hoặc skill không được để trống");
+        if (request == null || request.title() == null || request.level() == null || request.skill() == null || request.price() == null) { // THAY ĐỔI: Thêm request.price()
+            throw new IllegalArgumentException("Request, title, level, skill, hoặc price không được để trống");
         }
         lessonRepository.findByTitle(request.title())
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Tiêu đề bài học đã tồn tại: " + request.title());
                 });
+
         Lesson lesson = new Lesson(
                 request.title(),
                 request.description(),
                 request.level(),
-                request.skill()
+                request.skill(),
+                request.price() // THAY ĐỔI: Thêm price vào constructor
         );
         lesson = lessonRepository.save(lesson);
         return mapToLessonResponse(lesson);
@@ -52,20 +65,23 @@ public class LessonService {
     }
 
     public LessonResponse updateLesson(Integer lessonId, LessonRequest request) {
-        if (lessonId == null || request == null || request.title() == null || request.level() == null || request.skill() == null) {
-            throw new IllegalArgumentException("Lesson ID, request, title, level, hoặc skill không được để trống");
+        if (lessonId == null || request == null || request.title() == null || request.level() == null || request.skill() == null || request.price() == null) { // THAY ĐỔI: Thêm request.price()
+            throw new IllegalArgumentException("Lesson ID, request, title, level, skill, hoặc price không được để trống");
         }
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + lessonId));
+
         lessonRepository.findByTitle(request.title())
                 .filter(existing -> !existing.getLessonId().equals(lessonId))
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Tiêu đề bài học đã tồn tại: " + request.title());
                 });
+
         lesson.setTitle(request.title());
         lesson.setDescription(request.description() != null ? request.description() : lesson.getDescription());
         lesson.setLevel(request.level());
         lesson.setSkill(request.skill());
+        lesson.setPrice(request.price()); // THAY ĐỔI: Cập nhật price
         lesson = lessonRepository.save(lesson);
         return mapToLessonResponse(lesson);
     }
@@ -80,14 +96,18 @@ public class LessonService {
         lessonRepository.deleteById(lessonId);
     }
 
-    private LessonResponse mapToLessonResponse(Lesson lesson) {
+    public LessonResponse mapToLessonResponse(Lesson lesson) {
+        Integer durationMonths = LEVEL_DURATIONS.getOrDefault(lesson.getLevel(), null);
+
         return new LessonResponse(
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 lesson.getDescription(),
                 lesson.getLevel().toString(),
                 lesson.getSkill().toString(),
-                lesson.getCreatedAt()
+                lesson.getPrice(), // THAY ĐỔI: Thêm price vào response
+                lesson.getCreatedAt(),
+                durationMonths
         );
     }
 }

@@ -20,9 +20,5 @@ public class Question {
 
     @Column
     @Enumerated(EnumType.STRING)
-    private QuestionType type = QuestionType.MULTIPLE_CHOICE;
-
-    public enum QuestionType {
-        MULTIPLE_CHOICE, FILL_IN_THE_BLANK, LISTENING_COMPREHENSION, SPEAKING_PRONUNCIATION, READING_COMPREHENSION, WRITING_ESSAY
-    }
+    private Quiz.Skill skill; // Dùng chung enum với Quiz
 }

@@ -7,7 +7,9 @@ import org.example.projetc_backend.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -18,6 +20,12 @@ public class UserService {
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::mapToUserResponse)
+                .collect(Collectors.toList());
     }
 
     public Optional<User> findByUsername(String username) {
@@ -41,7 +49,7 @@ public class UserService {
         return userRepository.findById(userId);
     }
 
-    public UserResponse registerUser(String username, String email, String password, String fullName, String role) {
+    public UserResponse createUser(String username, String email, String password, String fullName, String avatarUrl, String role) {
         if (username == null || email == null || password == null) {
             throw new IllegalArgumentException("Username, email, và password là bắt buộc");
         }
@@ -59,6 +67,7 @@ public class UserService {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         user.setFullName(fullName);
+        user.setAvatarUrl(avatarUrl);
         user.setRole("ROLE_ADMIN".equalsIgnoreCase(role) ? User.Role.ROLE_ADMIN : User.Role.ROLE_USER);
 
         user = userRepository.save(user);
@@ -74,12 +83,26 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + userId));
 
+        user.setUsername(request.username() != null ? request.username() : user.getUsername());
+        user.setEmail(request.email() != null ? request.email() : user.getEmail());
         user.setFullName(request.fullName() != null ? request.fullName() : user.getFullName());
         user.setAvatarUrl(request.avatarUrl() != null ? request.avatarUrl() : user.getAvatarUrl());
+        user.setRole(request.role() != null && "ROLE_ADMIN".equalsIgnoreCase(request.role())
+                ? User.Role.ROLE_ADMIN : User.Role.ROLE_USER);
 
         user = userRepository.save(user);
 
         return mapToUserResponse(user);
+    }
+
+    public void deleteUser(Integer userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID không được để trống");
+        }
+        if (!userRepository.existsById(userId)) {
+            throw new IllegalArgumentException("Không tìm thấy người dùng với ID: " + userId);
+        }
+        userRepository.deleteById(userId);
     }
 
     private UserResponse mapToUserResponse(User user) {

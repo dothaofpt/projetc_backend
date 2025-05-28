@@ -7,5 +7,7 @@ public record AnswerResponse(
         Integer questionId,
         @JsonProperty("content")
         String answerText,
-        Boolean isCorrect
+        Boolean isCorrect,
+        Boolean isActive, // Trường này là quan trọng để frontend biết trạng thái của câu trả lời
+        Boolean isDeleted // THAY ĐỔI MỚI: Thêm trường này
 ) {}

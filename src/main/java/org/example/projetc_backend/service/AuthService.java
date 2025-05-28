@@ -73,8 +73,13 @@ public class AuthService {
             throw new IllegalArgumentException("Vai trò không hợp lệ hoặc không được phép gán ROLE_ADMIN");
         }
 
-        UserResponse userResponse = userService.registerUser(
-                request.username(), request.email(), request.password(), request.fullName(), request.role()
+        UserResponse userResponse = userService.createUser(
+                request.username(),
+                request.email(),
+                request.password(),
+                request.fullName(),
+                null, // avatarUrl là tùy chọn, mặc định null
+                request.role()
         );
 
         String token = jwtUtil.generateToken(userResponse.username(), userResponse.role());

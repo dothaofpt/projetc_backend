@@ -31,9 +31,24 @@ public class AnswerController {
         return ResponseEntity.ok(response);
     }
 
+    // Endpoint này (getAnswersByQuestionId) chỉ trả về các câu trả lời đang ACTIVE.
     @GetMapping("/question/{questionId}")
     public ResponseEntity<List<AnswerResponse>> getAnswersByQuestionId(@PathVariable Integer questionId) {
         List<AnswerResponse> responses = answerService.getAnswersByQuestionId(questionId);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * Lấy TẤT CẢ các câu trả lời (active và inactive) cho một câu hỏi cụ thể,
+     * NHƯNG KHÔNG BAO GỒM CÁC CÂU ĐÃ BỊ XÓA MỀM (isDeleted = true).
+     * Dùng cho trang quản trị viên hiển thị đầy đủ trạng thái.
+     *
+     * @param questionId ID của câu hỏi.
+     * @return Danh sách AnswerResponse của tất cả các câu trả lời chưa bị xóa mềm.
+     */
+    @GetMapping("/question/{questionId}/all")
+    public ResponseEntity<List<AnswerResponse>> getAllAnswersForAdminByQuestionId(@PathVariable Integer questionId) {
+        List<AnswerResponse> responses = answerService.getAllAnswersForAdminByQuestionId(questionId);
         return ResponseEntity.ok(responses);
     }
 
@@ -43,9 +58,30 @@ public class AnswerController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Endpoint để bật/tắt trạng thái (active/inactive) của một câu trả lời.
+     * Khi newStatus là false, câu trả lời sẽ bị 'disable'.
+     *
+     * @param answerId ID của câu trả lời.
+     * @param newStatus Trạng thái mới (true = active, false = inactive/disabled).
+     * @return AnswerResponse với trạng thái được cập nhật.
+     */
+    @PatchMapping("/{answerId}/status")
+    public ResponseEntity<AnswerResponse> toggleAnswerStatus(@PathVariable Integer answerId, @RequestParam boolean newStatus) {
+        AnswerResponse response = answerService.toggleAnswerStatus(answerId, newStatus);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Endpoint để "xóa mềm" một câu trả lời bằng cách đặt trạng thái isDeleted thành true.
+     * Câu trả lời sẽ không bị xóa khỏi cơ sở dữ liệu.
+     *
+     * @param answerId ID của câu trả lời cần xóa mềm.
+     * @return ResponseEntity.noContent() nếu thành công.
+     */
     @DeleteMapping("/{answerId}")
-    public ResponseEntity<Void> deleteAnswer(@PathVariable Integer answerId) {
-        answerService.deleteAnswer(answerId);
+    public ResponseEntity<Void> softDeleteAnswer(@PathVariable Integer answerId) {
+        answerService.softDeleteAnswer(answerId);
         return ResponseEntity.noContent().build();
     }
 }

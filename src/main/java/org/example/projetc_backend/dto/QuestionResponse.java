@@ -4,5 +4,5 @@ public record QuestionResponse(
         Integer questionId,
         Integer quizId,
         String questionText,
-        String type
+        String skill
 ) {}

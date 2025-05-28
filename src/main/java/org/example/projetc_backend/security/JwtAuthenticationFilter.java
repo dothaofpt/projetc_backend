@@ -47,13 +47,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (username != null && role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                    // Thêm role vào authorities
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    Collections.singletonList(new SimpleGrantedAuthority(role))
-                            );
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            Collections.singletonList(new SimpleGrantedAuthority(role))
+                    );
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }

@@ -1,6 +1,7 @@
 package org.example.projetc_backend.dto;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal; // Import này là cần thiết
 
 public record LessonResponse(
         Integer lessonId,
@@ -8,5 +9,8 @@ public record LessonResponse(
         String description,
         String level,
         String skill,
-        LocalDateTime createdAt
+        // THAY ĐỔI MỚI: Thêm trường price
+        BigDecimal price,
+        LocalDateTime createdAt,
+        Integer durationMonths
 ) {}
