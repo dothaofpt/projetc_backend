@@ -6,6 +6,8 @@ import org.example.projetc_backend.entity.Lesson;
 import org.example.projetc_backend.entity.Quiz;
 import org.example.projetc_backend.repository.LessonRepository;
 import org.example.projetc_backend.repository.QuizRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,7 +15,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class QuizService {
-
+    private static final Logger logger = LoggerFactory.getLogger(QuizService.class);
     private final QuizRepository quizRepository;
     private final LessonRepository lessonRepository;
 
@@ -26,16 +28,23 @@ public class QuizService {
         if (request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
             throw new IllegalArgumentException("Request, lessonId, title, hoặc skill không được để trống");
         }
+
+        logger.info("Processing QuizRequest with skill: {}", request.skill());
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
         quizRepository.findByTitle(request.title())
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Tiêu đề bài kiểm tra đã tồn tại: " + request.title());
                 });
+
         Quiz quiz = new Quiz();
         quiz.setLesson(lesson);
         quiz.setTitle(request.title());
-        quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
+        try {
+            quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Skill không hợp lệ: " + request.skill());
+        }
         quiz = quizRepository.save(quiz);
         return mapToQuizResponse(quiz);
     }
@@ -62,6 +71,8 @@ public class QuizService {
         if (quizId == null || request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
             throw new IllegalArgumentException("Quiz ID, request, lessonId, title, hoặc skill không được để trống");
         }
+
+        logger.info("Updating Quiz with ID: {}, skill: {}", quizId, request.skill());
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
         Lesson lesson = lessonRepository.findById(request.lessonId())
@@ -71,9 +82,14 @@ public class QuizService {
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Tiêu đề bài kiểm tra đã tồn tại: " + request.title());
                 });
+
         quiz.setLesson(lesson);
         quiz.setTitle(request.title());
-        quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
+        try {
+            quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Skill không hợp lệ: " + request.skill());
+        }
         quiz = quizRepository.save(quiz);
         return mapToQuizResponse(quiz);
     }

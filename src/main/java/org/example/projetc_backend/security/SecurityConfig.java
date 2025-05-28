@@ -36,12 +36,18 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        // Public endpoints (no authentication required)
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/lessons/**", "/api/vocabulary/**", "/api/quizzes/**",
-                                "/api/questions/**", "/api/answers/**", "/api/learning-materials/**")
+                        .requestMatchers("/api/quizzes/**", "/api/lessons/**", "/api/vocabulary/**").permitAll()
+
+                        // Protected endpoints
+                        .requestMatchers("/api/questions/**", "/api/answers/**", "/api/learning-materials/**")
                         .hasRole("ADMIN")
+
                         .requestMatchers("/api/progress/**", "/api/quiz-results/**", "/api/user-flashcards/**")
                         .hasAnyRole("ADMIN", "USER")
+
+                        // All other requests require authentication
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
