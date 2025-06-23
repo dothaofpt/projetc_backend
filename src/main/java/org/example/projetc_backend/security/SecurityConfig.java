@@ -35,7 +35,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        // Public endpoints (no authentication required)
                         .requestMatchers("/api/auth/**").permitAll()
+
                         .requestMatchers("/api/quizzes/**", "/api/vocabulary/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lessons/**").permitAll() // Cho phép GET cho tất cả
                         .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("ADMIN") // Giới hạn POST cho ADMIN
@@ -43,8 +45,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("ADMIN") // Giới hạn DELETE cho ADMIN
                         .requestMatchers("/api/stats").hasRole("ADMIN")
                         .requestMatchers("/api/questions/**", "/api/answers/**", "/api/learning-materials/**").hasRole("ADMIN")
+
+                        .requestMatchers("/api/quizzes/**", "/api/lessons/**", "/api/vocabulary/**").permitAll()
+
+                        // Protected endpoints
+                        .requestMatchers("/api/questions/**", "/api/answers/**", "/api/learning-materials/**")
+                        .hasRole("ADMIN")
+
+
                         .requestMatchers("/api/progress/**", "/api/quiz-results/**", "/api/user-flashcards/**")
                         .hasAnyRole("ADMIN", "USER")
+
+                        // All other requests require authentication
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
