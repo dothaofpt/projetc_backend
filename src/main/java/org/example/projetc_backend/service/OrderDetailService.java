@@ -2,10 +2,10 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.OrderDetailRequest;
 import org.example.projetc_backend.dto.OrderDetailResponse;
-import org.example.projetc_backend.dto.LessonResponse;
+import org.example.projetc_backend.dto.LessonResponse; // Đảm bảo đã có
 import org.example.projetc_backend.entity.OrderDetail;
 import org.example.projetc_backend.entity.Order;
-import org.example.projetc_backend.entity.Lesson;
+import org.example.projetc_backend.entity.Lesson; // BỔ SUNG IMPORT NÀY
 import org.example.projetc_backend.repository.OrderDetailRepository;
 import org.example.projetc_backend.repository.OrderRepository;
 import org.example.projetc_backend.repository.LessonRepository;
@@ -22,18 +22,19 @@ public class OrderDetailService {
     private final OrderDetailRepository orderDetailRepository;
     private final OrderRepository orderRepository;
     private final LessonRepository lessonRepository;
-    private final LessonService lessonService;
+    private final LessonService lessonService; // BỔ SUNG DEPENDENCY NÀY
 
     public OrderDetailService(OrderDetailRepository orderDetailRepository, OrderRepository orderRepository,
                               LessonRepository lessonRepository, LessonService lessonService) {
         this.orderDetailRepository = orderDetailRepository;
         this.orderRepository = orderRepository;
         this.lessonRepository = lessonRepository;
-        this.lessonService = lessonService;
+        this.lessonService = lessonService; // Inject lessonService
     }
 
     // THAY ĐỔI LỚN: Loại bỏ phương thức createOrderDetail,
     // vì OrderDetails nên được tạo cùng lúc với Order trong OrderService.
+    // Nếu bạn đã xóa endpoint trong controller, hãy xóa cả phương thức này.
 
     public OrderDetailResponse getOrderDetailById(Integer orderDetailId) {
         if (orderDetailId == null) {
@@ -71,21 +72,20 @@ public class OrderDetailService {
         OrderDetail orderDetail = orderDetailRepository.findById(orderDetailId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chi tiết đơn hàng với ID: " + orderDetailId));
 
-        Order oldOrder = orderDetail.getOrder(); // Lấy order cũ để có thể cập nhật lại nếu order thay đổi
+        Order oldOrder = orderDetail.getOrder();
         Order newOrder = orderRepository.findById(request.orderId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + request.orderId()));
 
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
 
-        orderDetail.setOrder(newOrder); // Cập nhật order cha
+        orderDetail.setOrder(newOrder);
         orderDetail.setLesson(lesson);
         orderDetail.setQuantity(request.quantity());
         orderDetail.setPriceAtPurchase(request.priceAtPurchase());
 
         OrderDetail updatedOrderDetail = orderDetailRepository.save(orderDetail);
 
-        // Cập nhật totalAmount của Order cũ (nếu order thay đổi) và Order mới
         if (!oldOrder.getOrderId().equals(newOrder.getOrderId())) {
             updateOrderTotalAmount(oldOrder); // Cập nhật lại tổng tiền của đơn hàng cũ
         }
@@ -102,21 +102,25 @@ public class OrderDetailService {
         OrderDetail orderDetail = orderDetailRepository.findById(orderDetailId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chi tiết đơn hàng với ID: " + orderDetailId));
 
-        Order parentOrder = orderDetail.getOrder();
+        Order parentOrder = orderDetail.getOrder(); // Lấy Order cha trước khi xóa OrderDetail
         orderDetailRepository.delete(orderDetail);
 
         // Cập nhật totalAmount của Order sau khi xóa
+        // Đảm bảo OrderService có phương thức để update totalAmount hoặc bạn gọi lại logic này
+        // (hiện tại logic này đang ở đây, và cũng có ở OrderService).
+        // Cần đảm bảo rằng việc xóa OrderDetail không làm hỏng mối quan hệ OneToMany của Order.
         updateOrderTotalAmount(parentOrder);
     }
 
     // Helper method để cập nhật totalAmount của Order
+    // Lưu ý: Phương thức này cũng có thể nằm trong OrderService để quản lý tập trung
     private void updateOrderTotalAmount(Order order) {
         List<OrderDetail> orderDetails = orderDetailRepository.findByOrder(order);
         BigDecimal totalAmount = orderDetails.stream()
                 .map(detail -> detail.getPriceAtPurchase().multiply(BigDecimal.valueOf(detail.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setTotalAmount(totalAmount);
-        orderRepository.save(order); // Lưu lại Order để cập nhật totalAmount
+        orderRepository.save(order);
     }
 
     // Map OrderDetail entity to OrderDetailResponse DTO

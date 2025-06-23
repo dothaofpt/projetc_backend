@@ -1,4 +1,4 @@
- package org.example.projetc_backend.controller;
+package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.PaymentRequest;
 import org.example.projetc_backend.dto.PaymentResponse;
@@ -29,7 +29,9 @@ public class PaymentController {
             PaymentResponse newPayment = paymentService.createPayment(request);
             return new ResponseEntity<>(newPayment, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST); // Nên trả về lỗi body với thông báo
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR); // Lỗi không mong muốn
         }
     }
 
@@ -70,24 +72,23 @@ public class PaymentController {
     }
 
     @PostMapping("/paypal/initiate")
-    public ResponseEntity<String> initiatePayPalPayment(
-            @Valid @RequestBody PaymentRequest request, // THAY ĐỔI NHỎ: Nên dùng PaymentRequest để đảm bảo đầy đủ thông tin cần thiết
-            @RequestParam String cancelUrl,
-            @RequestParam String successUrl) {
+    // CẬP NHẬT: Nhận cancelUrl và successUrl trực tiếp từ PaymentRequest
+    public ResponseEntity<String> initiatePayPalPayment(@Valid @RequestBody PaymentRequest request) {
         try {
             String redirectUrl = paymentService.initiatePayPalPayment(
                     request.userId(),
                     request.orderId(),
                     request.amount(),
-                    cancelUrl,
-                    successUrl
+                    request.cancelUrl(), // Lấy từ PaymentRequest
+                    request.successUrl()  // Lấy từ PaymentRequest
             );
             return new ResponseEntity<>(redirectUrl, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            // Nên trả về lỗi rõ ràng hơn thay vì chỉ null
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (PayPalRESTException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi khi khởi tạo thanh toán PayPal: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống khi khởi tạo thanh toán: " + e.getMessage());
         }
     }
 
@@ -99,15 +100,19 @@ public class PaymentController {
             PaymentResponse completedPayment = paymentService.completePayPalPayment(paymentId, payerId);
             return new ResponseEntity<>(completedPayment, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null); // Trả về lỗi rõ ràng hơn
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null); // Nên trả về body lỗi rõ ràng hơn
         } catch (PayPalRESTException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null); // Nên trả về body lỗi rõ ràng hơn
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null); // Lỗi không mong muốn
         }
     }
 
     @GetMapping("/paypal/cancel")
     public ResponseEntity<String> cancelPayPalPayment(@RequestParam("token") String token) {
-        // Bạn có thể thêm logic để cập nhật trạng thái đơn hàng bị hủy ở đây nếu cần
-        return new ResponseEntity<>("Thanh toán PayPal đã bị hủy bởi người dùng. Token: " + token, HttpStatus.OK);
+        // Logic để xử lý khi người dùng hủy thanh toán trên PayPal và được redirect về
+        // Bạn có thể tìm kiếm Payment/Order liên quan đến 'token' và cập nhật trạng thái là CANCELLED
+        System.out.println("Thanh toán PayPal đã bị hủy. Token: " + token);
+        return new ResponseEntity<>("Thanh toán PayPal đã bị hủy bởi người dùng.", HttpStatus.OK);
     }
 }

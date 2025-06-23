@@ -8,15 +8,18 @@ public record PaymentRequest(
         @NotNull(message = "User ID is required")
         Integer userId,
 
-        @NotNull(message = "Order ID is required for payment") // THAY ĐỔI: liên kết với OrderId
+        @NotNull(message = "Order ID is required for payment")
         Integer orderId,
 
-        // Amount có thể không cần thiết nếu backend tự tính từ Order
-        // Nhưng nếu muốn frontend gửi lên để kiểm tra, thì vẫn giữ
         @NotNull(message = "Amount is required")
         @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
         BigDecimal amount,
 
         String paymentMethod,
-        String description
+        String description,
+        // BỔ SUNG HAI TRƯỜNG NÀY
+        @NotNull(message = "Cancel URL is required for PayPal payment")
+        String cancelUrl,
+        @NotNull(message = "Success URL is required for PayPal payment")
+        String successUrl
 ) {}

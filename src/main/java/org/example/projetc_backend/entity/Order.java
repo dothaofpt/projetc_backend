@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.util.List; // Import List
 
 @Entity
 @Table(name = "Orders")
@@ -30,11 +31,15 @@ public class Order {
     @Column(name = "shipping_address", columnDefinition = "TEXT") // Nếu có địa chỉ giao hàng (ít khả năng cho Lesson)
     private String shippingAddress;
 
-    // Optional: Liên kết 1-1 với Payment nếu mỗi order chỉ có 1 payment.
-    // Nếu 1 order có thể có nhiều payment (ví dụ: trả góp), thì đây sẽ là OneToMany và Payment có FK về Order.
-    // Đối với thanh toán 1 lần cho 1 order, ta có thể dùng OneToOne
-    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // Liên kết 1-1 với Payment. 'mappedBy' chỉ ra rằng trường 'order' trong Payment entity là chủ sở hữu của mối quan hệ này.
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private Payment payment; // Liên kết với giao dịch thanh toán
+
+    // Liên kết 1-nhiều với OrderDetail
+    // CascadeType.ALL: các thao tác (persist, merge, remove) trên Order sẽ ảnh hưởng đến OrderDetail liên quan.
+    // orphanRemoval = true: Nếu một OrderDetail bị xóa khỏi danh sách orderDetails, nó sẽ bị xóa khỏi cơ sở dữ liệu.
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderDetail> orderDetails;
 
     public enum OrderStatus {
         PENDING,         // Đang chờ xử lý (chưa thanh toán hoặc đang chờ xác nhận)

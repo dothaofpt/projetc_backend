@@ -2,6 +2,8 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.LessonRequest;
 import org.example.projetc_backend.dto.LessonResponse;
+import org.example.projetc_backend.dto.LessonSearchRequest;
+import org.example.projetc_backend.dto.LessonPageResponse;
 import org.example.projetc_backend.service.LessonService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,5 +53,11 @@ public class LessonController {
     public ResponseEntity<Void> deleteLesson(@PathVariable Integer lessonId) {
         lessonService.deleteLesson(lessonId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/search")
+    public ResponseEntity<LessonPageResponse> searchLessons(@RequestBody LessonSearchRequest request) {
+        LessonPageResponse response = lessonService.searchLessons(request);
+        return ResponseEntity.ok(response);
     }
 }

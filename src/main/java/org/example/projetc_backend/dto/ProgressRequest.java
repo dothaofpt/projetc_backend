@@ -11,9 +11,11 @@ public record ProgressRequest(
         Integer userId,
         @NotNull(message = "Lesson ID is required")
         Integer lessonId,
-        @NotNull(message = "Skill is required")
-        @Pattern(regexp = "LISTENING|SPEAKING|READING|WRITING|VOCABULARY|GRAMMAR", message = "Skill must be one of: LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR")
-        String skill,
+        // THAY ĐỔI: Thay thế "Skill" bằng "ActivityType"
+        @NotNull(message = "Activity type is required")
+        @Pattern(regexp = "READING_MATERIAL|FLASHCARDS|QUIZ|LISTENING_PRACTICE|SPEAKING_EXERCISE|WRITING_TASK|GRAMMAR_EXERCISE|VOCABULARY_BUILDER",
+                message = "Activity type must be one of: READING_MATERIAL, FLASHCARDS, QUIZ, LISTENING_PRACTICE, SPEAKING_EXERCISE, WRITING_TASK, GRAMMAR_EXERCISE, VOCABULARY_BUILDER")
+        String activityType, // Cập nhật tên trường và các giá trị regex
         @NotBlank(message = "Status is required")
         @Pattern(regexp = "NOT_STARTED|IN_PROGRESS|COMPLETED", message = "Status must be one of: NOT_STARTED, IN_PROGRESS, COMPLETED")
         String status,

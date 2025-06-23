@@ -2,8 +2,8 @@ package org.example.projetc_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.math.BigDecimal; // Import này là cần thiết
 
 @Entity
 @Table(name = "lessons")
@@ -27,12 +27,14 @@ public class Lesson {
     @Column(nullable = false)
     private Skill skill;
 
-    // THAY ĐỔI MỚI: Thêm trường price
-    @Column(name = "price", nullable = false, precision = 10, scale = 2) // precision và scale cho số thập phân
+    @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
 
     @PrePersist
     protected void onCreate() {
@@ -52,11 +54,11 @@ public class Lesson {
     // Constructors
     public Lesson() {}
 
-    public Lesson(String title, String description, Level level, Skill skill, BigDecimal price) { // THAY ĐỔI: Thêm price vào constructor
+    public Lesson(String title, String description, Level level, Skill skill, BigDecimal price) {
         this.title = title;
         this.description = description;
         this.level = level;
         this.skill = skill;
-        this.price = price; // Gán price
+        this.price = price;
     }
 }

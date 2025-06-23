@@ -1,4 +1,4 @@
-package org.example.projetc_backend.repository;
+package org.example.projetc_backend.repository;// package org.example.projetc_backend.repository;
 
 import org.example.projetc_backend.entity.Enrollment;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +15,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
     // Tìm kiếm tất cả các đăng ký cho một lesson cụ thể
     List<Enrollment> findByLessonLessonId(Integer lessonId);
 
-    // Bạn có thể thêm các phương thức tìm kiếm khác nếu cần, ví dụ:
-    // List<Enrollment> findByUserUserId(Integer userId);
+    // THÊM DÒNG NÀY: Tìm kiếm tất cả các đăng ký của một người dùng cụ thể
+    List<Enrollment> findByUserUserId(Integer userId);
 }

@@ -1,13 +1,18 @@
 package org.example.projetc_backend.dto;
 
 import java.time.LocalDateTime;
+// Cần import LessonResponse để nhúng vào đây
+import org.example.projetc_backend.dto.LessonResponse;
 
 public record EnrollmentResponse(
         Integer enrollmentId,
         Integer userId,
-        String userName, // Tên người dùng để hiển thị cho admin
-        Integer lessonId,
-        String lessonTitle, // Tên bài học để hiển thị
+        String userName,
+        // Bỏ lessonId và lessonTitle cũ đi, vì chúng sẽ nằm trong LessonResponse
+        // Integer lessonId,
+        // String lessonTitle,
+        LessonResponse lesson, // <--- THÊM TRƯỜNG NÀY ĐỂ CHỨA TOÀN BỘ THÔNG TIN BÀI HỌC
         LocalDateTime enrollmentDate,
-        LocalDateTime expiryDate // Ngày hết hạn của khóa học
+        LocalDateTime expiryDate,
+        String status // <--- THÊM TRƯỜNG NÀY NẾU BẠN CÓ TÍNH TOÁN STATUS Ở BACKEND
 ) {}

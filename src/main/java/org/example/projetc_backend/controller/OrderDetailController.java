@@ -21,6 +21,7 @@ public class OrderDetailController {
     }
 
     // THAY ĐỔI LỚN: Loại bỏ endpoint POST để tạo OrderDetail riêng lẻ
+    // OrderDetails nên được tạo cùng lúc với Order trong OrderService.
     /*
     @PostMapping
     public ResponseEntity<OrderDetailResponse> createOrderDetail(@Valid @RequestBody OrderDetailRequest request) {

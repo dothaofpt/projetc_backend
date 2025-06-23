@@ -37,6 +37,23 @@ public class QuestionController {
         return ResponseEntity.ok(responses);
     }
 
+    /**
+     * Endpoint tìm kiếm câu hỏi.
+     * Các tham số quizId, skill, questionText đều là tùy chọn.
+     * Ví dụ:
+     * - GET /api/questions/search?questionText=hello
+     * - GET /api/questions/search?quizId=1&skill=READING
+     * - GET /api/questions/search?questionText=grammar&skill=GRAMMAR&quizId=2
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<QuestionResponse>> searchQuestions(
+            @RequestParam(required = false) Integer quizId,
+            @RequestParam(required = false) String skill,
+            @RequestParam(required = false) String questionText) {
+        List<QuestionResponse> responses = questionService.searchQuestions(quizId, skill, questionText);
+        return ResponseEntity.ok(responses);
+    }
+
     @PutMapping("/{questionId}")
     public ResponseEntity<QuestionResponse> updateQuestion(@PathVariable Integer questionId,
                                                            @RequestBody QuestionRequest request) {

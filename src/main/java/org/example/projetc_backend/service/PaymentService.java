@@ -3,10 +3,12 @@ package org.example.projetc_backend.service;
 import org.example.projetc_backend.dto.PaymentRequest;
 import org.example.projetc_backend.dto.PaymentResponse;
 import org.example.projetc_backend.dto.UserResponse;
- import org.example.projetc_backend.dto.LessonResponse; // Có thể xóa import này nếu không dùng trực tiếp
+// import org.example.projetc_backend.dto.LessonResponse; // Có thể xóa import này nếu không dùng trực tiếp
 import org.example.projetc_backend.entity.Payment;
 import org.example.projetc_backend.entity.User;
 import org.example.projetc_backend.entity.Order;
+import org.example.projetc_backend.entity.OrderDetail; // Cần import để duyệt OrderDetails
+import org.example.projetc_backend.entity.Lesson; // Cần import nếu Lesson được truy cập trực tiếp
 import org.example.projetc_backend.repository.PaymentRepository;
 import org.example.projetc_backend.repository.UserRepository;
 import org.example.projetc_backend.repository.OrderRepository;
@@ -26,19 +28,21 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
-    private final LessonService lessonService; // Vẫn cần cho việc map Lesson trong OrderDetails của OrderResponse
+    private final LessonService lessonService; // Vẫn cần cho việc map Lesson trong OrderDetails của OrderResponse (hoặc để cấp quyền)
     private final PayPalService payPalService;
 
     public PaymentService(PaymentRepository paymentRepository, UserRepository userRepository,
-                          OrderRepository orderRepository, LessonService lessonService,
+                          OrderRepository orderRepository, LessonService lessonService, // Có thể cần thêm UserService hoặc một service để quản lý quyền truy cập
                           PayPalService payPalService) {
         this.paymentRepository = paymentRepository;
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
-        this.lessonService = lessonService;
+        this.lessonService = lessonService; // Giả sử lessonService có phương thức để cấp quyền truy cập
         this.payPalService = payPalService;
     }
 
+    // Endpoint này có thể dùng cho các phương thức thanh toán khác ngoài PayPal
+    // hoặc là một bước khởi tạo Payment record trước khi chuyển sang cổng thanh toán.
     @Transactional
     public PaymentResponse createPayment(PaymentRequest request) {
         if (request == null || request.userId() == null || request.orderId() == null || request.amount() == null) {
@@ -54,19 +58,14 @@ public class PaymentService {
         Order order = orderRepository.findById(request.orderId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + request.orderId()));
 
-        // THAY ĐỔI NHỎ: Kiểm tra số tiền chính xác hơn
         if (request.amount().compareTo(order.getTotalAmount()) != 0) {
             throw new IllegalArgumentException("Số tiền thanh toán (" + request.amount() + ") không khớp với tổng giá trị đơn hàng (" + order.getTotalAmount() + ").");
         }
 
-        // THAY ĐỔI NHỎ: Kiểm tra trạng thái đơn hàng để tránh thanh toán lại
         if (order.getStatus() == Order.OrderStatus.COMPLETED || order.getStatus() == Order.OrderStatus.PROCESSING) {
             throw new IllegalArgumentException("Đơn hàng #" + order.getOrderId() + " đã được xử lý hoặc đang xử lý.");
         }
 
-        // THAY ĐỔI NHỎ: Kiểm tra xem đã có Payment cho Order này chưa.
-        // Mặc dù bạn đã có unique = true trên order_id trong entity Payment,
-        // việc kiểm tra trước sẽ giúp hiển thị lỗi thân thiện hơn.
         if (paymentRepository.findByOrder(order).isPresent()) {
             throw new IllegalArgumentException("Đơn hàng #" + order.getOrderId() + " đã có giao dịch thanh toán liên kết.");
         }
@@ -83,14 +82,8 @@ public class PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
-        // THAY ĐỔI NHỎ: Luôn cập nhật trạng thái đơn hàng nếu thanh toán được tạo thành công
-        // Nếu payment này là bước đầu tiên trong luồng thanh toán (ví dụ: cho các cổng khác PayPal)
-        // Order có thể chuyển từ PENDING sang PROCESSING hoặc COMPLETED tùy thuộc vào phương thức.
-        // Với PayPal, trạng thái sẽ được xử lý trong initiatePayPalPayment.
-        // Bạn có thể bỏ đoạn này nếu chỉ dùng initiatePayPalPayment làm entry point
-        // và muốn trạng thái order chỉ được update sau khi PayPal phản hồi.
         if (order.getStatus() == Order.OrderStatus.PENDING) {
-            order.setStatus(Order.OrderStatus.PROCESSING); // Hoặc giữ nguyên PENDING nếu chỉ để theo dõi trạng thái payment
+            order.setStatus(Order.OrderStatus.PROCESSING);
             orderRepository.save(order);
         }
 
@@ -98,6 +91,8 @@ public class PaymentService {
     }
 
     @Transactional
+    // THAY ĐỔI: Chức năng này sẽ được gọi từ PaymentController với PaymentRequest mới
+    // Các tham số cancelUrl và successUrl sẽ được lấy từ request object.
     public String initiatePayPalPayment(Integer userId, Integer orderId, BigDecimal amount, String cancelUrl, String successUrl) throws PayPalRESTException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + userId));
@@ -112,14 +107,10 @@ public class PaymentService {
             throw new IllegalArgumentException("Số tiền thanh toán (" + amount + ") không khớp với tổng giá trị đơn hàng (" + order.getTotalAmount() + ").");
         }
 
-        // THAY ĐỔI NHỎ: Kiểm tra xem đã có Payment PENDING cho Order này chưa
         Optional<Payment> existingPendingPayment = paymentRepository.findByOrder(order);
         if (existingPendingPayment.isPresent() && existingPendingPayment.get().getStatus() == Payment.PaymentStatus.PENDING) {
-            // Có thể trả về URL hiện có hoặc báo lỗi nếu muốn mỗi Order chỉ có 1 lần khởi tạo
-            // return "Đơn hàng này đã có giao dịch thanh toán PENDING. URL: " + existingPendingPayment.get().getDescription(); // Ví dụ
             throw new IllegalArgumentException("Đơn hàng này đã có giao dịch thanh toán PENDING.");
         }
-
 
         Payment localPayment = new Payment();
         localPayment.setUser(user);
@@ -132,7 +123,7 @@ public class PaymentService {
 
         com.paypal.api.payments.Payment paypalPayment = payPalService.createPayment(
                 amount.doubleValue(),
-                "USD", // THAY ĐỔI CẦN LƯU Ý: Currency cần được cấu hình chính xác, ví dụ "VND" nếu PayPal hỗ trợ hoặc chuyển đổi.
+                "USD", // ĐẢM BẢO CURRENCY NÀY KHỚP VỚI CẤU HÌNH PAYPAL VÀ SỐ TIỀN THỰC TẾ
                 "paypal",
                 "sale",
                 localPayment.getDescription(),
@@ -143,9 +134,7 @@ public class PaymentService {
         localPayment.setTransactionId(paypalPayment.getId()); // ID của PayPal transaction
         paymentRepository.save(localPayment);
 
-        // THAY ĐỔI NHỎ: Trạng thái Order nên chuyển sang PROCESSING ngay sau khi khởi tạo PayPal
-        // để tránh người dùng khởi tạo lại hoặc thanh toán bằng phương thức khác cùng lúc.
-        order.setStatus(Order.OrderStatus.PROCESSING);
+        order.setStatus(Order.OrderStatus.PROCESSING); // Đơn hàng đang chờ PayPal xử lý
         orderRepository.save(order);
 
         for (com.paypal.api.payments.Links link : paypalPayment.getLinks()) {
@@ -158,13 +147,11 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse completePayPalPayment(String paypalPaymentId, String payerId) throws PayPalRESTException {
-        // Lấy Payment cục bộ trước để có Order
         Payment localPayment = paymentRepository.findByTransactionId(paypalPaymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch PayPal cục bộ với ID: " + paypalPaymentId));
 
-        // Kiểm tra xem Payment đã hoàn thành/thất bại chưa
         if (localPayment.getStatus() != Payment.PaymentStatus.PENDING) {
-            // Có thể trả về PaymentResponse hiện tại hoặc báo lỗi nếu muốn
+            // Nếu giao dịch đã được xử lý (COMPLETED/FAILED/CANCELLED), không cần xử lý lại
             return mapToPaymentResponse(localPayment);
         }
 
@@ -175,20 +162,34 @@ public class PaymentService {
         if (executedPayment.getState().equals("approved")) {
             localPayment.setStatus(Payment.PaymentStatus.COMPLETED);
             order.setStatus(Order.OrderStatus.COMPLETED);
-            // THÊM LOGIC GÁN QUYỀN TRUY CẬP BÀI HỌC Ở ĐÂY SAU KHI THANH TOÁN HOÀN TẤT
-            // Ví dụ: user.addAccessToLesson(lesson);
-            // Hoặc bạn có thể có một service riêng để xử lý việc kích hoạt khóa học.
+
+            // BỔ SUNG: LOGIC CẤP QUYỀN TRUY CẬP BÀI HỌC/KHÓA HỌC SAU KHI THANH TOÁN HOÀN TẤT
+            // Duyệt qua các OrderDetail trong Order để lấy thông tin các bài học/khóa học đã mua
+            // và cấp quyền truy cập cho User (localPayment.getUser())
+            if (order.getOrderDetails() != null) {
+                for (OrderDetail detail : order.getOrderDetails()) {
+                    Lesson lesson = detail.getLesson(); // Giả sử OrderDetail có trường 'lesson' hoặc 'course'
+                    if (lesson != null) {
+                        // Gọi một phương thức trong LessonService hoặc một service khác
+                        // để cập nhật trạng thái truy cập của người dùng cho bài học này
+                        // Ví dụ: lessonService.grantAccessToLesson(order.getUser(), lesson);
+                        // Cần đảm bảo LessonService có phương thức này và xử lý lưu vào DB
+                        System.out.println("Cấp quyền truy cập bài học: " + lesson.getTitle() + " cho người dùng: " + order.getUser().getUsername());
+                        // Ví dụ thực tế:
+                        // userLessonAccessService.grantAccess(order.getUser().getUserId(), lesson.getLessonId());
+                        // Cần thêm Service và Entity UserLessonAccess nếu chưa có
+                    }
+                }
+            }
+
         } else if (executedPayment.getState().equals("failed") || executedPayment.getState().equals("denied")) {
             localPayment.setStatus(Payment.PaymentStatus.FAILED);
             order.setStatus(Order.OrderStatus.CANCELLED); // Hoặc FAILED_PAYMENT nếu bạn có trạng thái đó
         } else {
-            // Nếu trạng thái khác approved/failed/denied (ví dụ: created, pending)
-            // Có thể giữ nguyên PENDING hoặc xử lý cụ thể hơn tùy vào luồng của PayPal
-            localPayment.setStatus(Payment.PaymentStatus.PENDING);
-            // order.setStatus(Order.OrderStatus.PROCESSING); // Giữ nguyên trạng thái Processing
+            localPayment.setStatus(Payment.PaymentStatus.PENDING); // Giữ nguyên trạng thái PENDING nếu PayPal chưa xác nhận
         }
 
-        localPayment.setPaymentDate(LocalDateTime.now()); // Cập nhật thời gian hoàn tất/thất bại
+        localPayment.setPaymentDate(LocalDateTime.now());
         Payment savedPayment = paymentRepository.save(localPayment);
         orderRepository.save(order);
 
@@ -229,13 +230,6 @@ public class PaymentService {
         }
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thanh toán với ID: " + paymentId));
-        // Bạn có thể cân nhắc logic khi xóa payment: có nên hoàn tiền, thay đổi trạng thái order không?
-        // Ví dụ:
-        // Order order = payment.getOrder();
-        // if (order != null && order.getStatus() == Order.OrderStatus.COMPLETED) {
-        //     order.setStatus(Order.OrderStatus.CANCELLED); // Hoặc một trạng thái "refunded"
-        //     orderRepository.save(order);
-        // }
         paymentRepository.delete(payment);
     }
 
@@ -253,7 +247,6 @@ public class PaymentService {
             );
         }
 
-        // THAY ĐỔI: Sử dụng orderId từ payment thay vì LessonResponse
         Integer orderId = null;
         if (payment.getOrder() != null) {
             orderId = payment.getOrder().getOrderId();
@@ -262,7 +255,7 @@ public class PaymentService {
         return new PaymentResponse(
                 payment.getPaymentId(),
                 userResponse,
-                orderId, // Trả về orderId
+                orderId,
                 payment.getAmount(),
                 payment.getPaymentDate(),
                 payment.getPaymentMethod(),

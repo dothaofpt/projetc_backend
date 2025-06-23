@@ -3,6 +3,8 @@ package org.example.projetc_backend.controller;
 import org.example.projetc_backend.dto.FlashcardResponse;
 import org.example.projetc_backend.dto.UserFlashcardRequest;
 import org.example.projetc_backend.dto.UserFlashcardResponse;
+import org.example.projetc_backend.dto.FlashcardSearchRequest;
+import org.example.projetc_backend.dto.FlashcardPageResponse;
 import org.example.projetc_backend.service.FlashcardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +32,13 @@ public class FlashcardController {
     @PostMapping("/mark")
     public ResponseEntity<UserFlashcardResponse> markFlashcard(@RequestBody UserFlashcardRequest request) {
         UserFlashcardResponse response = flashcardService.markFlashcard(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/search/user/{userId}")
+    public ResponseEntity<FlashcardPageResponse> searchFlashcards(@PathVariable Integer userId,
+                                                                  @RequestBody FlashcardSearchRequest request) {
+        FlashcardPageResponse response = flashcardService.searchFlashcards(userId, request);
         return ResponseEntity.ok(response);
     }
 }

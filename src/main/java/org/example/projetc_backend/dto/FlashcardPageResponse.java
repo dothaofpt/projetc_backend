@@ -1,2 +1,11 @@
-package org.example.projetc_backend.dto;public class FlashcardPageResponse {
-}
+package org.example.projetc_backend.dto;
+
+import java.util.List;
+
+public record FlashcardPageResponse(
+        List<FlashcardResponse> content,
+        long totalElements,
+        int totalPages,
+        int page,
+        int size
+) {}

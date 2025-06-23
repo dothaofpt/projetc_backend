@@ -1,14 +1,19 @@
 package org.example.projetc_backend.service;
 
+import org.example.projetc_backend.dto.FlashcardPageResponse;
 import org.example.projetc_backend.dto.FlashcardResponse;
 import org.example.projetc_backend.dto.UserFlashcardRequest;
 import org.example.projetc_backend.dto.UserFlashcardResponse;
+import org.example.projetc_backend.dto.FlashcardSearchRequest;
 import org.example.projetc_backend.entity.LessonVocabulary;
 import org.example.projetc_backend.entity.UserFlashcard;
 import org.example.projetc_backend.entity.Vocabulary;
 import org.example.projetc_backend.repository.LessonVocabularyRepository;
 import org.example.projetc_backend.repository.UserFlashcardRepository;
 import org.example.projetc_backend.repository.VocabularyRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -66,6 +71,46 @@ public class FlashcardService {
                 flashcard.getUserId(),
                 flashcard.getWordId(),
                 flashcard.isKnown()
+        );
+    }
+
+    public FlashcardPageResponse searchFlashcards(Integer userId, FlashcardSearchRequest request) {
+        if (request == null || userId == null) {
+            throw new IllegalArgumentException("Search request hoặc User ID không được để trống");
+        }
+
+        String sortBy = request.sortBy();
+        if (!List.of("wordId", "word", "meaning", "difficultyLevel").contains(sortBy)) {
+            sortBy = "wordId";
+        }
+
+        Sort sort = Sort.by(request.sortDir().equalsIgnoreCase("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
+        PageRequest pageable = PageRequest.of(request.page(), request.size(), sort);
+
+        Page<UserFlashcard> flashcardPage = userFlashcardRepository.searchUserFlashcards(
+                userId,
+                request.lessonId(),
+                request.word(),
+                request.meaning(),
+                request.isKnown(),
+                request.difficultyLevel(),
+                pageable
+        );
+
+        List<FlashcardResponse> content = flashcardPage.getContent().stream()
+                .map(uf -> {
+                    Vocabulary vocab = vocabularyRepository.findById(uf.getWordId())
+                            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + uf.getWordId()));
+                    return FlashcardResponse.fromVocabulary(vocab, uf.isKnown());
+                })
+                .collect(Collectors.toList());
+
+        return new FlashcardPageResponse(
+                content,
+                flashcardPage.getTotalElements(),
+                flashcardPage.getTotalPages(),
+                flashcardPage.getNumber(),
+                flashcardPage.getSize()
         );
     }
 }

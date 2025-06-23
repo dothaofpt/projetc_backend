@@ -14,8 +14,11 @@ import org.example.projetc_backend.repository.OrderDetailRepository;
 import org.example.projetc_backend.repository.OrderRepository;
 import org.example.projetc_backend.repository.UserRepository;
 import org.example.projetc_backend.repository.LessonRepository;
+import org.springframework.data.jpa.domain.Specification; // Import này là quan trọng
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.persistence.criteria.Predicate; // Import này là quan trọng
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,7 +33,7 @@ public class OrderService {
     private final OrderDetailRepository orderDetailRepository;
     private final UserRepository userRepository;
     private final LessonRepository lessonRepository;
-    private final LessonService lessonService; // Để map Lesson sang DTO
+    private final LessonService lessonService;
 
     public OrderService(OrderRepository orderRepository, OrderDetailRepository orderDetailRepository, UserRepository userRepository, LessonRepository lessonRepository, LessonService lessonService) {
         this.orderRepository = orderRepository;
@@ -49,13 +52,11 @@ public class OrderService {
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
 
-        // Khởi tạo Order entity
         Order order = new Order();
         order.setUser(user);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(Order.OrderStatus.PENDING); // Mặc định là PENDING
 
-        // Tính toán totalAmount và chuẩn bị OrderDetails
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderDetail> orderDetails = new ArrayList<>();
 
@@ -63,44 +64,30 @@ public class OrderService {
             Lesson lesson = lessonRepository.findById(itemRequest.lessonId())
                     .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + itemRequest.lessonId()));
 
-            // LỖI NẰM Ở ĐÂY TRƯỚC ĐÓ: Bạn đã dùng giá trị cố định.
-            // Bây giờ chúng ta lấy giá từ Lesson entity đã tìm thấy.
-            BigDecimal lessonPrice = lesson.getPrice(); // <-- ĐÂY LÀ SỬA CHỮA QUAN TRỌNG NHẤT!
+            BigDecimal lessonPrice = lesson.getPrice();
 
-            if (lessonPrice == null) { // Đảm bảo giá không phải là null từ DB
+            if (lessonPrice == null) {
                 throw new IllegalArgumentException("Giá của bài học ID " + itemRequest.lessonId() + " không được xác định.");
             }
 
-            // Tạo OrderDetail entity
             OrderDetail orderDetail = new OrderDetail();
-            // orderDetail.setOrder(order); // Sẽ được set sau khi order được lưu lần đầu
             orderDetail.setLesson(lesson);
             orderDetail.setQuantity(itemRequest.quantity());
             orderDetail.setPriceAtPurchase(lessonPrice); // Lưu giá tại thời điểm mua
-
+            orderDetail.setOrder(order); // Gắn Order (chưa được lưu) vào OrderDetail
             orderDetails.add(orderDetail);
             totalAmount = totalAmount.add(lessonPrice.multiply(BigDecimal.valueOf(itemRequest.quantity())));
         }
 
-        // Đặt totalAmount cho Order trước khi lưu lần đầu
         order.setTotalAmount(totalAmount);
+        order.setOrderDetails(orderDetails); // QUAN TRỌNG: Gắn danh sách OrderDetail vào Order
 
-        // Lưu Order vào Database để có orderId (nó sẽ được gắn với OrderDetail)
-        Order savedOrder = orderRepository.save(order);
-
-        // Gắn orderId cho từng OrderDetail và lưu chúng
-        for (OrderDetail detail : orderDetails) {
-            detail.setOrder(savedOrder); // Gán Order đã lưu vào OrderDetail
-        }
-        orderDetailRepository.saveAll(orderDetails); // Lưu tất cả chi tiết đơn hàng
-
-
-        // Không cần save lại savedOrder ở đây vì totalAmount đã được set trước khi save lần đầu
-        // và đối tượng `order` vẫn trong cùng transaction nếu bạn muốn cập nhật thêm
+        Order savedOrder = orderRepository.save(order); // Lưu Order (và cả OrderDetails nhờ CascadeType.ALL)
 
         return mapToOrderResponse(savedOrder);
     }
 
+    @Transactional(readOnly = true)
     public OrderResponse getOrderById(Integer orderId) {
         if (orderId == null) {
             throw new IllegalArgumentException("Order ID không được để trống.");
@@ -110,12 +97,14 @@ public class OrderService {
         return mapToOrderResponse(order);
     }
 
+    @Transactional(readOnly = true)
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll().stream()
                 .map(this::mapToOrderResponse)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByUserId(Integer userId) {
         if (userId == null) {
             throw new IllegalArgumentException("User ID không được để trống.");
@@ -123,6 +112,61 @@ public class OrderService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + userId));
         return orderRepository.findByUser(user).stream()
+                .map(this::mapToOrderResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Tìm kiếm đơn hàng dựa trên các tiêu chí tùy chọn.
+     * @param userId ID của người dùng (tùy chọn)
+     * @param status Trạng thái đơn hàng (tùy chọn)
+     * @param minDate Ngày bắt đầu khoảng thời gian (tùy chọn)
+     * @param maxDate Ngày kết thúc khoảng thời gian (tùy chọn)
+     * @param minTotalAmount Tổng tiền tối thiểu (tùy chọn)
+     * @param maxTotalAmount Tổng tiền tối đa (tùy chọn)
+     * @param username Tên người dùng (tìm kiếm gần đúng, không phân biệt chữ hoa/thường) (tùy chọn)
+     * @return Danh sách các OrderResponse phù hợp với tiêu chí tìm kiếm.
+     */
+    @Transactional(readOnly = true)
+    public List<OrderResponse> searchOrders(
+            Integer userId,
+            Order.OrderStatus status,
+            LocalDateTime minDate,
+            LocalDateTime maxDate,
+            BigDecimal minTotalAmount,
+            BigDecimal maxTotalAmount,
+            String username
+    ) {
+        Specification<Order> spec = (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (userId != null) {
+                predicates.add(criteriaBuilder.equal(root.get("user").get("userId"), userId));
+            }
+            if (status != null) {
+                predicates.add(criteriaBuilder.equal(root.get("status"), status));
+            }
+            if (minDate != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("orderDate"), minDate));
+            }
+            if (maxDate != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("orderDate"), maxDate));
+            }
+            if (minTotalAmount != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("totalAmount"), minTotalAmount));
+            }
+            if (maxTotalAmount != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("totalAmount"), maxTotalAmount));
+            }
+            if (username != null && !username.trim().isEmpty()) {
+                // Tìm kiếm không phân biệt chữ hoa/thường và theo chuỗi con trong tên người dùng
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("user").get("username")), "%" + username.toLowerCase() + "%"));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return orderRepository.findAll(spec).stream()
                 .map(this::mapToOrderResponse)
                 .collect(Collectors.toList());
     }
@@ -148,11 +192,6 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + orderId));
 
-        // Xóa các OrderDetail liên quan trước (hoặc dùng CascadeType.ALL trên Order entity)
-        // Nếu bạn có CascadeType.ALL trên @OneToMany của Order, bạn có thể bỏ dòng này
-        orderDetailRepository.deleteAll(orderDetailRepository.findByOrder(order));
-
-        // Sau đó xóa Order
         orderRepository.delete(order);
     }
 
@@ -160,7 +199,6 @@ public class OrderService {
     private OrderResponse mapToOrderResponse(Order order) {
         UserResponse userResponse = null;
         if (order.getUser() != null) {
-            // Đảm bảo UserResponse constructor khớp với số lượng tham số
             userResponse = new UserResponse(
                     order.getUser().getUserId(),
                     order.getUser().getUsername(),
@@ -172,7 +210,7 @@ public class OrderService {
             );
         }
 
-        List<OrderDetailResponse> itemResponses = orderDetailRepository.findByOrder(order).stream()
+        List<OrderDetailResponse> itemResponses = order.getOrderDetails().stream()
                 .map(this::mapToOrderDetailResponse)
                 .collect(Collectors.toList());
 
@@ -190,7 +228,6 @@ public class OrderService {
     private OrderDetailResponse mapToOrderDetailResponse(OrderDetail orderDetail) {
         LessonResponse lessonResponse = null;
         if (orderDetail.getLesson() != null) {
-            // Đảm bảo LessonService.mapToLessonResponse là public và constructor LessonResponse khớp
             lessonResponse = lessonService.mapToLessonResponse(orderDetail.getLesson());
         }
 

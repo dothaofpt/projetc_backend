@@ -1,4 +1,4 @@
-package org.example.projetc_backend.controller;
+package org.example.projetc_backend.controller;// package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.EnrollmentRequest;
 import org.example.projetc_backend.dto.EnrollmentResponse;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/enrollments") // Base URL cho các API liên quan đến đăng ký
+@RequestMapping("/api/enrollments")
 @CrossOrigin(origins = {"http://localhost:4200", "http://localhost:8000", "http://localhost:8080", "http://localhost:61299"})
 public class EnrollmentController {
 
@@ -20,24 +20,13 @@ public class EnrollmentController {
         this.enrollmentService = enrollmentService;
     }
 
-    /**
-     * Endpoint để đăng ký một người dùng vào một khóa học.
-     * User hoặc Admin có thể thực hiện.
-     * @param request EnrollmentRequest chứa userId và lessonId.
-     * @return ResponseEntity với EnrollmentResponse của đăng ký vừa tạo.
-     */
     @PostMapping("/enroll")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')") // Cả user và admin đều có thể đăng ký
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<EnrollmentResponse> enrollUserInLesson(@RequestBody EnrollmentRequest request) {
         EnrollmentResponse response = enrollmentService.enrollUserInLesson(request);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Endpoint để lấy tất cả các đăng ký khóa học.
-     * Chỉ Admin mới có quyền truy cập.
-     * @return ResponseEntity với danh sách EnrollmentResponse.
-     */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<EnrollmentResponse>> getAllEnrollments() {
@@ -45,11 +34,20 @@ public class EnrollmentController {
         return ResponseEntity.ok(responses);
     }
 
+    // THÊM ENDPOINT MỚI NÀY: Lấy danh sách đăng ký của một người dùng cụ thể
     /**
-     * Endpoint để lấy danh sách các đăng ký khóa học sắp hết hạn hoặc đã hết hạn.
-     * Chỉ Admin mới có quyền truy cập.
+     * Endpoint để lấy danh sách các đăng ký khóa học của một người dùng cụ thể.
+     * Cả User và Admin đều có thể truy cập.
+     * @param userId ID của người dùng.
      * @return ResponseEntity với danh sách EnrollmentResponse.
      */
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')") // Cả user và admin đều có thể xem đăng ký của user
+    public ResponseEntity<List<EnrollmentResponse>> getUserEnrollments(@PathVariable Integer userId) {
+        List<EnrollmentResponse> responses = enrollmentService.getEnrollmentsByUserId(userId);
+        return ResponseEntity.ok(responses);
+    }
+
     @GetMapping("/expiring")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<EnrollmentResponse>> getExpiringEnrollments() {
@@ -57,12 +55,6 @@ public class EnrollmentController {
         return ResponseEntity.ok(responses);
     }
 
-    /**
-     * Endpoint để xóa một đăng ký khóa học.
-     * Chỉ Admin mới có quyền truy cập.
-     * @param enrollmentId ID của đăng ký cần xóa.
-     * @return ResponseEntity không nội dung (204 No Content) nếu xóa thành công.
-     */
     @DeleteMapping("/{enrollmentId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteEnrollment(@PathVariable Integer enrollmentId) {

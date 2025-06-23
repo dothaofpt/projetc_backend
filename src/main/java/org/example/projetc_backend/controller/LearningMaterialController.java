@@ -2,7 +2,9 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.LearningMaterialRequest;
 import org.example.projetc_backend.dto.LearningMaterialResponse;
+import org.example.projetc_backend.dto.LearningMaterialSearchRequest;
 import org.example.projetc_backend.service.LearningMaterialService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,5 +50,11 @@ public class LearningMaterialController {
     public ResponseEntity<Void> deleteLearningMaterial(@PathVariable Integer materialId) {
         learningMaterialService.deleteLearningMaterial(materialId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/search")
+    public ResponseEntity<Page<LearningMaterialResponse>> searchLearningMaterials(@RequestBody LearningMaterialSearchRequest request) {
+        Page<LearningMaterialResponse> responses = learningMaterialService.searchLearningMaterials(request);
+        return ResponseEntity.ok(responses);
     }
 }
