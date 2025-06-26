@@ -7,5 +7,6 @@ public record QuizResultResponse(
         Integer userId,
         Integer quizId,
         Integer score,
-        LocalDateTime completedAt
+        LocalDateTime completedAt,
+        Integer durationSeconds // Bổ sung
 ) {}

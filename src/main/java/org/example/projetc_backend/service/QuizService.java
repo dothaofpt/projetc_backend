@@ -2,16 +2,21 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.QuizRequest;
 import org.example.projetc_backend.dto.QuizResponse;
+import org.example.projetc_backend.dto.QuizSearchRequest;
+import org.example.projetc_backend.dto.QuizPageResponse;
 import org.example.projetc_backend.entity.Lesson;
 import org.example.projetc_backend.entity.Quiz;
 import org.example.projetc_backend.repository.LessonRepository;
 import org.example.projetc_backend.repository.QuizRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Thêm import này cho @Transactional
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime; // Đảm bảo import này nếu Quiz có trường createdAt
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,45 +39,33 @@ public class QuizService {
      * @return QuizResponse chứa thông tin của bài kiểm tra đã tạo.
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ hoặc không tìm thấy Lesson.
      */
-    @Transactional // Đảm bảo toàn vẹn dữ liệu cho thao tác ghi
+    @Transactional
     public QuizResponse createQuiz(QuizRequest request) {
-        // 1. Kiểm tra tính hợp lệ cơ bản của request
         if (request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
-            throw new IllegalArgumentException("Request, lessonId, title, hoặc skill không được để trống.");
+            throw new IllegalArgumentException("Lesson ID, tiêu đề và kỹ năng của bài kiểm tra là bắt buộc.");
         }
 
         logger.info("Processing createQuiz request for skill: {}", request.skill());
 
-        // 2. Tìm bài học (Lesson) liên quan. Nếu không tìm thấy, ném ngoại lệ.
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
 
-        // 3. Kiểm tra trùng lặp tiêu đề bài kiểm tra
-        quizRepository.findByTitle(request.title())
+        quizRepository.findByTitle(request.title().trim())
                 .ifPresent(existing -> {
-                    throw new IllegalArgumentException("Tiêu đề bài kiểm tra đã tồn tại: " + request.title());
+                    throw new IllegalArgumentException("Tiêu đề bài kiểm tra '" + request.title() + "' đã tồn tại.");
                 });
 
-        // 4. Tạo đối tượng Quiz và gán các giá trị từ request
         Quiz quiz = new Quiz();
         quiz.setLesson(lesson);
-        quiz.setTitle(request.title());
+        quiz.setTitle(request.title().trim());
 
-        // 5. Chuyển đổi và gán Skill (Enum)
-        try {
-            quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
-        } catch (IllegalArgumentException e) {
-            // Xử lý khi skill không hợp lệ (ví dụ: chuỗi không khớp với enum nào)
-            throw new IllegalArgumentException("Skill không hợp lệ: '" + request.skill() + "'. Vui lòng kiểm tra lại. Chi tiết lỗi: " + e.getMessage());
-        }
+        // SỬA LỖI: request.skill() đã là enum, không cần toUpperCase()
+        quiz.setSkill(request.skill());
 
-        // 6. Gán thời gian tạo. Đảm bảo Quiz entity có trường 'createdAt' và kiểu LocalDateTime.
         quiz.setCreatedAt(LocalDateTime.now());
 
-        // 7. Lưu Quiz vào cơ sở dữ liệu
         quiz = quizRepository.save(quiz);
 
-        // 8. Ánh xạ Quiz entity sang QuizResponse DTO và trả về
         return mapToQuizResponse(quiz);
     }
 
@@ -82,12 +75,11 @@ public class QuizService {
      * @return QuizResponse chứa thông tin bài kiểm tra.
      * @throws IllegalArgumentException nếu quizId trống hoặc không tìm thấy bài kiểm tra.
      */
+    @Transactional(readOnly = true)
     public QuizResponse getQuizById(Integer quizId) {
         if (quizId == null) {
             throw new IllegalArgumentException("Quiz ID không được để trống.");
         }
-        // findById của JpaRepository nhận kiểu ID của entity.
-        // Dựa vào code của bạn, có vẻ Quiz entity có ID là Integer, nên giữ nguyên.
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
         return mapToQuizResponse(quiz);
@@ -97,14 +89,16 @@ public class QuizService {
      * Lấy danh sách các bài kiểm tra theo ID bài học (Lesson ID).
      * @param lessonId ID của bài học.
      * @return Danh sách QuizResponse của các bài kiểm tra thuộc bài học đó.
-     * @throws IllegalArgumentException nếu lessonId trống.
+     * @throws IllegalArgumentException nếu lessonId trống hoặc không tìm thấy Lesson.
      */
+    @Transactional(readOnly = true)
     public List<QuizResponse> getQuizzesByLessonId(Integer lessonId) {
         if (lessonId == null) {
             throw new IllegalArgumentException("Lesson ID không được để trống.");
         }
-        // findByLessonLessonId cần khớp với tên phương thức trong QuizRepository
-        // và kiểu ID của Lesson entity.
+        if (!lessonRepository.existsById(lessonId)) {
+            throw new IllegalArgumentException("Không tìm thấy bài học với ID: " + lessonId);
+        }
         return quizRepository.findByLessonLessonId(lessonId).stream()
                 .map(this::mapToQuizResponse)
                 .collect(Collectors.toList());
@@ -114,11 +108,49 @@ public class QuizService {
      * Lấy tất cả các bài kiểm tra hiện có trong hệ thống.
      * @return Danh sách QuizResponse của tất cả các bài kiểm tra.
      */
+    @Transactional(readOnly = true)
     public List<QuizResponse> getAllQuizzes() {
         logger.info("Fetching all quizzes.");
         return quizRepository.findAll().stream()
                 .map(this::mapToQuizResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Tìm kiếm và phân trang các bài kiểm tra.
+     *
+     * @param request DTO chứa các tiêu chí tìm kiếm (lessonId, title, skill) và thông tin phân trang/sắp xếp.
+     * @return Trang các QuizResponse.
+     * @throws IllegalArgumentException Nếu Search request trống.
+     */
+    @Transactional(readOnly = true)
+    public QuizPageResponse searchQuizzes(QuizSearchRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Search request không được để trống.");
+        }
+
+        // SỬA LỖI: Sử dụng accessor methods cho các trường của Record DTO
+        Sort sort = Sort.by(request.sortDir().equalsIgnoreCase("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, request.sortBy());
+        PageRequest pageable = PageRequest.of(request.page(), request.size(), sort);
+
+        Page<Quiz> quizPage = quizRepository.searchQuizzes(
+                request.lessonId(),
+                request.title(),
+                request.skill(),
+                pageable
+        );
+
+        List<QuizResponse> content = quizPage.getContent().stream()
+                .map(this::mapToQuizResponse)
+                .collect(Collectors.toList());
+
+        return new QuizPageResponse(
+                content,
+                quizPage.getTotalElements(),
+                quizPage.getTotalPages(),
+                quizPage.getNumber(),
+                quizPage.getSize()
+        );
     }
 
     /**
@@ -128,62 +160,48 @@ public class QuizService {
      * @return QuizResponse chứa thông tin bài kiểm tra đã cập nhật.
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ, không tìm thấy Quiz/Lesson, hoặc tiêu đề trùng lặp.
      */
-    @Transactional // Đảm bảo toàn vẹn dữ liệu cho thao tác ghi
+    @Transactional
     public QuizResponse updateQuiz(Integer quizId, QuizRequest request) {
-        // 1. Kiểm tra tính hợp lệ cơ bản của request và quizId
         if (quizId == null || request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
-            throw new IllegalArgumentException("Quiz ID, request, lessonId, title, hoặc skill không được để trống.");
+            throw new IllegalArgumentException("Quiz ID, Lesson ID, tiêu đề và kỹ năng của bài kiểm tra là bắt buộc.");
         }
 
         logger.info("Updating Quiz with ID: {}, skill: {}", quizId, request.skill());
 
-        // 2. Tìm quiz hiện có. Nếu không tìm thấy, ném ngoại lệ.
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
 
-        // 3. Tìm lesson mới (nếu có thay đổi hoặc muốn xác nhận lessonId hợp lệ).
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
 
-        // 4. Kiểm tra trùng lặp tiêu đề, nhưng cho phép chính quiz đang cập nhật
-        quizRepository.findByTitle(request.title())
-                .filter(existing -> !existing.getQuizId().equals(quizId)) // Bỏ qua nếu tiêu đề thuộc về chính quiz đang cập nhật
+        quizRepository.findByTitle(request.title().trim())
+                .filter(existing -> !existing.getQuizId().equals(quizId))
                 .ifPresent(existing -> {
-                    throw new IllegalArgumentException("Tiêu đề bài kiểm tra đã tồn tại: " + request.title());
+                    throw new IllegalArgumentException("Tiêu đề bài kiểm tra '" + request.title() + "' đã tồn tại.");
                 });
 
-        // 5. Cập nhật các trường thông tin của Quiz
         quiz.setLesson(lesson);
-        quiz.setTitle(request.title());
+        quiz.setTitle(request.title().trim());
 
-        // 6. Chuyển đổi và gán Skill (Enum)
-        try {
-            quiz.setSkill(Quiz.Skill.valueOf(request.skill()));
-        } catch (IllegalArgumentException e) {
-            // Xử lý khi skill không hợp lệ
-            throw new IllegalArgumentException("Skill không hợp lệ: '" + request.skill() + "'. Vui lòng kiểm tra lại. Chi tiết lỗi: " + e.getMessage());
-        }
+        // SỬA LỖI: request.skill() đã là enum, không cần toUpperCase()
+        quiz.setSkill(request.skill());
 
-        // Không cập nhật createdAt khi update (nếu bạn muốn createdAt chỉ được set 1 lần lúc tạo)
-
-        // 7. Lưu Quiz đã cập nhật vào cơ sở dữ liệu
         quiz = quizRepository.save(quiz);
 
-        // 8. Ánh xạ Quiz entity sang QuizResponse DTO và trả về
         return mapToQuizResponse(quiz);
     }
 
     /**
      * Xóa một bài kiểm tra khỏi cơ sở dữ liệu.
+     * Khi xóa Quiz, các Question và QuizResult liên quan (nếu có cascade cấu hình đúng) cũng sẽ bị ảnh hưởng.
      * @param quizId ID của bài kiểm tra cần xóa.
      * @throws IllegalArgumentException nếu quizId trống hoặc không tìm thấy bài kiểm tra.
      */
-    @Transactional // Đảm bảo toàn vẹn dữ liệu cho thao tác xóa
+    @Transactional
     public void deleteQuiz(Integer quizId) {
         if (quizId == null) {
             throw new IllegalArgumentException("Quiz ID không được để trống.");
         }
-        // Kiểm tra sự tồn tại trước khi xóa để ném ngoại lệ rõ ràng hơn
         if (!quizRepository.existsById(quizId)) {
             throw new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId);
         }
@@ -196,15 +214,12 @@ public class QuizService {
      * @return Đối tượng QuizResponse DTO tương ứng.
      */
     private QuizResponse mapToQuizResponse(Quiz quiz) {
-        // Đảm bảo QuizResponse record/class có constructor phù hợp
-        // và các getter của Quiz entity trả về đúng kiểu dữ liệu.
         return new QuizResponse(
                 quiz.getQuizId(),
-                // Kiểm tra null cho getLesson() để tránh NullPointerException nếu lesson chưa được gán
                 quiz.getLesson() != null ? quiz.getLesson().getLessonId() : null,
                 quiz.getTitle(),
-                quiz.getSkill().toString(), // Chuyển Enum sang String
-                quiz.getCreatedAt() // Bao gồm createdAt nếu có
+                quiz.getSkill(),
+                quiz.getCreatedAt()
         );
     }
 }

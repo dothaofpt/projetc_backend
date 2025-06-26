@@ -4,7 +4,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -12,14 +11,11 @@ import java.util.Objects;
 @Data
 @NoArgsConstructor
 public class LessonVocabularyId implements Serializable {
-
     @Column(name = "lesson_id")
     private Integer lessonId;
-
     @Column(name = "word_id")
     private Integer wordId;
 
-    // ✅ Constructor để sử dụng: new LessonVocabularyId(lessonId, wordId)
     public LessonVocabularyId(Integer lessonId, Integer wordId) {
         this.lessonId = lessonId;
         this.wordId = wordId;

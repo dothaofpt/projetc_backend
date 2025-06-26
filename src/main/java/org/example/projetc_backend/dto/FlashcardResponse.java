@@ -1,29 +1,23 @@
 package org.example.projetc_backend.dto;
 
-import org.example.projetc_backend.entity.Vocabulary;
+import java.time.LocalDateTime;
+import org.example.projetc_backend.entity.Vocabulary; // Import enum từ entity
 
 public record FlashcardResponse(
+        Integer userFlashcardId, // Thay đổi id thành userFlashcardId để rõ ràng
+        Integer userId,
         Integer wordId,
         String word,
         String meaning,
         String exampleSentence,
         String pronunciation,
         String audioUrl,
+        String imageUrl, // Bổ sung
         String writingPrompt,
-        String difficultyLevel,
-        boolean isKnown
-) {
-    public static FlashcardResponse fromVocabulary(Vocabulary vocabulary, boolean isKnown) {
-        return new FlashcardResponse(
-                vocabulary.getWordId(),
-                vocabulary.getWord() != null ? vocabulary.getWord() : "",
-                vocabulary.getMeaning() != null ? vocabulary.getMeaning() : "",
-                vocabulary.getExampleSentence() != null ? vocabulary.getExampleSentence() : "",
-                vocabulary.getPronunciation() != null ? vocabulary.getPronunciation() : "",
-                vocabulary.getAudioUrl() != null ? vocabulary.getAudioUrl() : "",
-                vocabulary.getWritingPrompt() != null ? vocabulary.getWritingPrompt() : "",
-                vocabulary.getDifficultyLevel() != null ? vocabulary.getDifficultyLevel().toString() : "EASY",
-                isKnown
-        );
-    }
-}
+        Vocabulary.DifficultyLevel difficultyLevel, // Sử dụng enum trực tiếp
+        Boolean isKnown,
+        LocalDateTime lastReviewedAt, // Bổ sung
+        LocalDateTime nextReviewAt,   // Bổ sung
+        Integer reviewIntervalDays,   // Bổ sung
+        Double easeFactor            // Bổ sung
+) {}

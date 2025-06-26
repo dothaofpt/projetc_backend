@@ -6,10 +6,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository; // Thêm import này
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository // Thêm annotation này
 public interface LearningMaterialRepository extends JpaRepository<LearningMaterial, Integer> {
     List<LearningMaterial> findByLessonLessonId(Integer lessonId);
     List<LearningMaterial> findByMaterialType(LearningMaterial.MaterialType materialType);

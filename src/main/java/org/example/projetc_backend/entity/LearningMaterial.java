@@ -20,10 +20,13 @@ public class LearningMaterial {
     private MaterialType materialType;
 
     @Column(name = "material_url", columnDefinition = "TEXT")
-    private String materialUrl = "";
+    private String materialUrl = ""; // URL tới file (audio, video, PDF)
 
     @Column(columnDefinition = "TEXT")
-    private String description;
+    private String description; // Mô tả tài liệu
+
+    @Column(name = "transcript_text", columnDefinition = "TEXT") // Bổ sung: Lưu trữ bản text của audio/video
+    private String transcriptText;
 
     public enum MaterialType {
         AUDIO, VIDEO, TEXT, IMAGE, PDF

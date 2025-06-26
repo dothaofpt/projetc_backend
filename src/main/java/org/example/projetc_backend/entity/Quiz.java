@@ -14,14 +14,14 @@ public class Quiz {
 
     @ManyToOne
     @JoinColumn(name = "lesson_id", nullable = false)
-    private Lesson lesson;
+    private Lesson lesson; // Bài học mà quiz này thuộc về
 
     @Column(length = 255)
     private String title = "";
 
     @Column
     @Enumerated(EnumType.STRING)
-    private Skill skill = Skill.VOCABULARY;
+    private Skill skill = Skill.VOCABULARY; // Kỹ năng chính mà quiz này kiểm tra
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -2,14 +2,16 @@ package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import org.example.projetc_backend.entity.Question; // Import enum từ entity
 
 public record QuestionRequest(
         @NotNull(message = "Quiz ID is required")
         Integer quizId,
         @NotBlank(message = "Question text is required")
         String questionText,
-        @NotNull(message = "Skill is required")
-        @Pattern(regexp = "LISTENING|SPEAKING|READING|WRITING|VOCABULARY|GRAMMAR", message = "Skill must be one of: LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR")
-        String skill
+        @NotNull(message = "Question type is required")
+        Question.QuestionType questionType, // Sử dụng enum trực tiếp
+        String audioUrl, // Bổ sung
+        String imageUrl, // Bổ sung
+        String correctAnswerText // Bổ sung (cho các loại câu hỏi không có Answer riêng)
 ) {}

@@ -15,19 +15,11 @@ public class Payment {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
-    private User user; // Liên kết với người dùng thực hiện thanh toán
+    private User user;
 
-    // THAY ĐỔI MỚI: Liên kết với Order thay vì Lesson trực tiếp
-    @OneToOne // Một Payment cho một Order (giả định 1-1)
-    @JoinColumn(name = "order_id", nullable = false, unique = true) // Mỗi Order chỉ có 1 Payment
-    private Order order; // Đơn hàng mà thanh toán này xử lý
-
-    // Bạn có thể bỏ Lesson lesson nếu mọi thứ đều qua OrderDetail
-    // Hoặc giữ lại nếu muốn linh hoạt thanh toán trực tiếp cho Lesson mà không cần Order
-    // Để giữ logic chặt chẽ, tôi sẽ loại bỏ Lesson lesson ở đây vì nó đã có trong OrderDetail
-    // @ManyToOne
-    // @JoinColumn(name = "lesson_id", nullable = true)
-    // private Lesson lesson;
+    @OneToOne
+    @JoinColumn(name = "order_id", nullable = false, unique = true)
+    private Order order;
 
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

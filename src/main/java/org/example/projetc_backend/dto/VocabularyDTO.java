@@ -2,7 +2,7 @@ package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import org.example.projetc_backend.entity.Vocabulary;
 
 public record VocabularyDTO(
         Integer wordId,
@@ -13,8 +13,8 @@ public record VocabularyDTO(
         String exampleSentence,
         String pronunciation,
         String audioUrl,
+        String imageUrl,
         String writingPrompt,
         @NotNull(message = "Difficulty level is required")
-        @Pattern(regexp = "EASY|MEDIUM|HARD", message = "Difficulty level must be one of: EASY, MEDIUM, HARD")
-        String difficultyLevel
+        Vocabulary.DifficultyLevel difficultyLevel
 ) {}

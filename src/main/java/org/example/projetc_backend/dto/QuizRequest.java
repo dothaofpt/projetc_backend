@@ -2,9 +2,7 @@ package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-
-import java.time.LocalDateTime;
+import org.example.projetc_backend.entity.Quiz;
 
 public record QuizRequest(
         @NotNull(message = "Lesson ID is required")
@@ -12,6 +10,5 @@ public record QuizRequest(
         @NotBlank(message = "Title is required")
         String title,
         @NotNull(message = "Skill is required")
-        @Pattern(regexp = "LISTENING|SPEAKING|READING|WRITING|VOCABULARY|GRAMMAR", message = "Skill must be one of: LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR")
-        String skill
+        Quiz.Skill skill
 ) {}

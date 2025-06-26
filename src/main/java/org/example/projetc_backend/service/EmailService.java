@@ -14,13 +14,14 @@ public class EmailService {
     }
 
     public void sendOtpEmail(String toEmail, String otp) {
-        if (toEmail == null || otp == null) {
-            throw new IllegalArgumentException("Email and OTP không được để trống");
+        if (toEmail == null || toEmail.trim().isEmpty() || otp == null || otp.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email và OTP không được để trống.");
         }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
-        message.setSubject("Mã OTP để đặt lại mật khẩu");
+        message.setSubject("Mã OTP để đặt lại mật khẩu của bạn");
         message.setText("Mã OTP của bạn là: " + otp + ". Mã này có hiệu lực trong 10 phút.");
+        message.setFrom("noreply@yourdomain.com"); // Đặt email gửi đi (thường cấu hình trong application.properties)
         mailSender.send(message);
     }
 }

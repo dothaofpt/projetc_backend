@@ -6,7 +6,7 @@ import com.paypal.base.rest.PayPalRESTException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct; // Import for @PostConstruct
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,25 +15,16 @@ public class PayPalService {
     private final APIContext apiContext;
     private final String clientId;
     private final String clientSecret;
+    private final String mode; // <-- Thêm biến này để lưu trữ mode
 
     public PayPalService(
             @Value("${paypal.client.id}") String clientId,
             @Value("${paypal.client.secret}") String clientSecret,
-            @Value("${paypal.base.url}") String baseUrl
+            @Value("${paypal.mode}") String mode
     ) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
-
-        String mode;
-        if (baseUrl.contains("sandbox")) {
-            mode = "sandbox";
-        } else if (baseUrl.contains("api-m.paypal.com")) {
-            mode = "live";
-        } else {
-            mode = "sandbox"; // Mặc định là sandbox nếu không rõ
-            System.err.println("Cảnh báo: baseUrl không xác định môi trường PayPal, mặc định là sandbox.");
-        }
-
+        this.mode = mode; // <-- Gán giá trị mode vào biến instance
         this.apiContext = new APIContext(clientId, clientSecret, mode);
     }
 
@@ -43,14 +34,26 @@ public class PayPalService {
         System.out.println("Injected Client ID: " + clientId);
         // Chỉ in một phần của Secret Key để tránh lộ thông tin nhạy cảm trong log công khai
         System.out.println("Injected Client Secret (first 5 chars): " +
-                (clientSecret != null && clientSecret.length() >= 5 ? clientSecret.substring(0, 5) + "..." : clientSecret));
+                (clientSecret != null && clientSecret.length() >= 5 ? clientSecret.substring(0, 5) + "..." : "[Hidden]"));
+        System.out.println("PayPal API Mode: " + this.mode); // <-- Sử dụng biến instance 'mode'
         System.out.println("--- End PayPalService Configuration ---");
     }
 
-
+    /**
+     * Tạo một thanh toán PayPal.
+     * @param total Tổng số tiền.
+     * @param currency Loại tiền tệ (ví dụ: "USD").
+     * @param method Phương thức thanh toán (ví dụ: "paypal").
+     * @param intent Mục đích giao dịch (ví dụ: "sale").
+     * @param description Mô tả giao dịch.
+     * @param cancelUrl URL nếu người dùng hủy thanh toán.
+     * @param successUrl URL nếu thanh toán thành công.
+     * @return Đối tượng Payment từ PayPal API.
+     * @throws PayPalRESTException nếu có lỗi khi tạo thanh toán.
+     */
     public com.paypal.api.payments.Payment createPayment(
             double total,
-            String currency, // Đảm bảo currency này phù hợp với tài khoản PayPal của bạn (USD, VND,...)
+            String currency,
             String method,
             String intent,
             String description,
@@ -59,7 +62,7 @@ public class PayPalService {
     ) throws PayPalRESTException {
         Amount amount = new Amount();
         amount.setCurrency(currency);
-        amount.setTotal(String.format("%.2f", total));
+        amount.setTotal(String.format("%.2f", total)); // Định dạng 2 chữ số thập phân
 
         Transaction transaction = new Transaction();
         transaction.setDescription(description);
@@ -84,11 +87,21 @@ public class PayPalService {
         return payment.create(apiContext);
     }
 
+    /**
+     * Thực thi một thanh toán PayPal sau khi người dùng chấp thuận.
+     * @param paymentId ID của thanh toán từ PayPal.
+     * @param payerId ID người thanh toán được PayPal cung cấp sau khi chấp thuận.
+     * @return Đối tượng Payment đã được thực thi từ PayPal API.
+     * @throws PayPalRESTException nếu có lỗi khi thực thi thanh toán.
+     */
     public com.paypal.api.payments.Payment executePayment(String paymentId, String payerId) throws PayPalRESTException {
         com.paypal.api.payments.Payment payment = new com.paypal.api.payments.Payment();
-        payment.setId(paymentId);
+        payment.setId(paymentId); // Set ID của thanh toán cần thực thi
+
         PaymentExecution paymentExecution = new PaymentExecution();
-        paymentExecution.setPayerId(payerId);
+        paymentExecution.setPayerId(payerId); // Set Payer ID từ người dùng
+
+        // Thực thi thanh toán
         return payment.execute(apiContext, paymentExecution);
     }
 }

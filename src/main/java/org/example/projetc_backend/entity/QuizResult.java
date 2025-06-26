@@ -21,8 +21,11 @@ public class QuizResult {
     private Quiz quiz;
 
     @Column
-    private Integer score = 0;
+    private Integer score = 0; // Điểm số của bài quiz (từ 0-100 hoặc số câu đúng)
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt = LocalDateTime.now();
+
+    @Column(name = "duration_seconds") // Bổ sung: Thời gian làm bài
+    private Integer durationSeconds;
 }

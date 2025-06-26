@@ -8,18 +8,24 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository; // Thêm import này
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+@Repository // Thêm annotation này
 public interface LessonRepository extends JpaRepository<Lesson, Integer> {
     Optional<Lesson> findByTitle(String title);
 
-    @Query("SELECT l FROM Lesson l WHERE l.isDeleted = false")
-    List<Lesson> findAllActive();
+    List<Lesson> findByIsDeletedFalse(); // Đổi tên cho rõ ràng hơn
 
-    @Query("SELECT l FROM Lesson l WHERE l.isDeleted = false AND (:title is null or l.title like %:title%) AND (:level is null or l.level = :level) AND (:skill is null or l.skill = :skill) AND (:minPrice is null or l.price >= :minPrice) AND (:maxPrice is null or l.price <= :maxPrice)")
+    @Query("SELECT l FROM Lesson l WHERE l.isDeleted = false AND " +
+            "(:title IS NULL OR LOWER(l.title) LIKE LOWER(CONCAT('%', :title, '%'))) AND " +
+            "(:level IS NULL OR l.level = :level) AND " +
+            "(:skill IS NULL OR l.skill = :skill) AND " +
+            "(:minPrice IS NULL OR l.price >= :minPrice) AND " +
+            "(:maxPrice IS NULL OR l.price <= :maxPrice)")
     Page<Lesson> searchLessons(
             @Param("title") String title,
             @Param("level") Level level,

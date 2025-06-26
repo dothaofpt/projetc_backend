@@ -1,11 +1,11 @@
 package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.Pattern;
+import org.example.projetc_backend.entity.LearningMaterial; // Import enum từ entity
 
 public record LearningMaterialSearchRequest(
         Integer lessonId,
-        @Pattern(regexp = "AUDIO|VIDEO|TEXT|IMAGE|PDF|^$", message = "Material type must be one of: AUDIO, VIDEO, TEXT, IMAGE, PDF or empty")
-        String materialType,
+        LearningMaterial.MaterialType materialType, // Sử dụng enum trực tiếp
         String description,
         Integer page,
         Integer size,

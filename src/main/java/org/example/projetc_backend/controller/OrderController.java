@@ -2,20 +2,21 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.OrderRequest;
 import org.example.projetc_backend.dto.OrderResponse;
+import org.example.projetc_backend.dto.OrderSearchRequest; // <-- Rất quan trọng: Thêm import này
 import org.example.projetc_backend.entity.Order;
 import org.example.projetc_backend.service.OrderService;
+import org.springframework.data.domain.Page; // <-- Rất quan trọng: Thêm import này để xử lý kết quả phân trang
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import jakarta.validation.Valid; // Để kích hoạt validation cho OrderRequest và OrderSearchRequest
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "*") // Đảm bảo đã có CORS nếu cần
+@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:8000", "http://localhost:8080", "http://localhost:61299"})
 public class OrderController {
 
     private final OrderService orderService;
@@ -26,42 +27,51 @@ public class OrderController {
 
     /**
      * Tạo một đơn hàng mới.
-     * POST /api/orders
+     * Cả USER và ADMIN đều có quyền. USER chỉ có thể tạo đơn hàng cho chính mình.
      * @param request DTO chứa thông tin đơn hàng.
      * @return ResponseEntity với OrderResponse của đơn hàng đã tạo.
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest request) {
         try {
             OrderResponse newOrder = orderService.createOrder(request);
             return new ResponseEntity<>(newOrder, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            // Cung cấp thông báo lỗi rõ ràng hơn trong body
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            // Xử lý các lỗi không mong muốn khác
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
     /**
      * Lấy thông tin đơn hàng bằng ID.
-     * GET /api/orders/{id}
+     * Chỉ ADMIN mới có quyền truy cập mặc định.
+     * Cân nhắc thêm quyền cho USER để truy cập đơn hàng của chính họ.
      * @param id ID của đơn hàng.
      * @return ResponseEntity với OrderResponse.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Ví dụ nâng cao: "hasRole('ADMIN') or (hasRole('USER') and @orderService.isOrderBelongsToUser(#id, authentication.principal.id))"
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Integer id) {
         try {
             OrderResponse order = orderService.getOrderById(id);
             return new ResponseEntity<>(order, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 
     /**
      * Lấy tất cả các đơn hàng.
-     * GET /api/orders
+     * Chỉ ADMIN mới có quyền truy cập.
+     * (Lưu ý: Endpoint này có thể được gộp vào `/api/orders/search` để linh hoạt hơn và sử dụng phân trang).
      * @return ResponseEntity với danh sách OrderResponse.
      */
-    @GetMapping
+    @GetMapping("/all") // Đổi sang /all để tránh xung đột với /api/orders/search (nếu bạn muốn giữ riêng getAll)
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<OrderResponse>> getAllOrders() {
         List<OrderResponse> orders = orderService.getAllOrders();
         return new ResponseEntity<>(orders, HttpStatus.OK);
@@ -69,54 +79,62 @@ public class OrderController {
 
     /**
      * Lấy tất cả các đơn hàng của một người dùng cụ thể.
-     * GET /api/orders/user/{userId}
+     * Cả USER và ADMIN đều có quyền (USER chỉ xem được của chính mình, ADMIN xem được của bất kỳ ai).
      * @param userId ID của người dùng.
      * @return ResponseEntity với danh sách OrderResponse.
      */
     @GetMapping("/user/{userId}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('USER') and #userId == authentication.principal.id)") // Kiểm tra quyền truy cập của USER
     public ResponseEntity<List<OrderResponse>> getOrdersByUserId(@PathVariable Integer userId) {
         try {
             List<OrderResponse> orders = orderService.getOrdersByUserId(userId);
             return new ResponseEntity<>(orders, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 
     /**
-     * Tìm kiếm đơn hàng với các tiêu chí tùy chọn.
-     * GET /api/orders/search
-     * @param userId ID của người dùng (tùy chọn)
-     * @param status Trạng thái đơn hàng (tùy chọn, ví dụ: PENDING, COMPLETED)
-     * @param minDate Ngày bắt đầu khoảng thời gian (ISO-8601 format, ví dụ: 2023-01-01T00:00:00) (tùy chọn)
-     * @param maxDate Ngày kết thúc khoảng thời gian (ISO-8601 format, ví dụ: 2023-12-31T23:59:59) (tùy chọn)
-     * @param minTotalAmount Tổng tiền tối thiểu (tùy chọn)
-     * @param maxTotalAmount Tổng tiền tối đa (tùy chọn)
-     * @param username Tên người dùng (tìm kiếm gần đúng, không phân biệt chữ hoa/thường) (tùy chọn)
-     * @return ResponseEntity với danh sách OrderResponse phù hợp.
+     * Tìm kiếm và phân trang đơn hàng với các tiêu chí tùy chọn.
+     * Chỉ ADMIN mới có quyền truy cập.
+     * Endpoint này nhận các tham số tìm kiếm và phân trang thông qua `OrderSearchRequest` DTO.
+     *
+     * @param searchRequest DTO chứa các tiêu chí tìm kiếm và thông tin phân trang/sắp xếp.
+     * Spring sẽ tự động bind các query parameter vào DTO này.
+     * @return ResponseEntity với Page<OrderResponse> phù hợp.
      */
-    @GetMapping("/search")
-    public ResponseEntity<List<OrderResponse>> searchOrders(
-            @RequestParam(required = false) Integer userId,
-            @RequestParam(required = false) Order.OrderStatus status,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime minDate,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime maxDate,
-            @RequestParam(required = false) BigDecimal minTotalAmount,
-            @RequestParam(required = false) BigDecimal maxTotalAmount,
-            @RequestParam(required = false) String username) {
-        List<OrderResponse> orders = orderService.searchOrders(
-                userId, status, minDate, maxDate, minTotalAmount, maxTotalAmount, username);
-        return new ResponseEntity<>(orders, HttpStatus.OK);
+    @GetMapping("/search") // Sử dụng GET cho tìm kiếm với query parameters, Spring sẽ ánh xạ vào DTO
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<OrderResponse>> searchOrders(@Valid @ModelAttribute OrderSearchRequest searchRequest) {
+        try {
+            // Gọi phương thức searchOrders trong service với DTO
+            Page<OrderResponse> orders = orderService.searchOrders(
+                    searchRequest.userId(),
+                    searchRequest.status(),
+                    searchRequest.minDate(),
+                    searchRequest.maxDate(),
+                    searchRequest.minTotalAmount(),
+                    searchRequest.maxTotalAmount(),
+                    searchRequest.username(),
+                    searchRequest.toPageable() // <-- Phương thức toPageable() mới trong DTO
+            );
+            return new ResponseEntity<>(orders, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
     /**
      * Cập nhật trạng thái đơn hàng.
-     * PUT /api/orders/{id}/status
+     * Chỉ ADMIN mới có quyền.
      * @param id ID của đơn hàng.
      * @param newStatus Trạng thái mới.
      * @return ResponseEntity với OrderResponse đã cập nhật.
      */
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderResponse> updateOrderStatus(
             @PathVariable Integer id,
             @RequestParam("status") Order.OrderStatus newStatus) {
@@ -124,23 +142,24 @@ public class OrderController {
             OrderResponse updatedOrder = orderService.updateOrderStatus(id, newStatus);
             return new ResponseEntity<>(updatedOrder, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
 
     /**
      * Xóa một đơn hàng.
-     * DELETE /api/orders/{id}
+     * Chỉ ADMIN mới có quyền.
      * @param id ID của đơn hàng cần xóa.
      * @return ResponseEntity với HttpStatus.NO_CONTENT.
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteOrder(@PathVariable Integer id) {
         try {
             orderService.deleteOrder(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 }

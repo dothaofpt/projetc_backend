@@ -1,14 +1,14 @@
 package org.example.projetc_backend.dto;
 
 import java.time.LocalDateTime;
+import org.example.projetc_backend.entity.Progress;
 
 public record ProgressResponse(
         Integer progressId,
         Integer userId,
         Integer lessonId,
-        // THAY ĐỔI: Thay thế "Skill" bằng "ActivityType"
-        String activityType, // Cập nhật tên trường
-        String status,
+        Progress.ActivityType activityType,
+        Progress.Status status,
         Integer completionPercentage,
         LocalDateTime lastUpdated
 ) {}

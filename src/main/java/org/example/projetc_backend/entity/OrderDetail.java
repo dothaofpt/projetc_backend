@@ -14,19 +14,18 @@ public class OrderDetail {
 
     @ManyToOne
     @JoinColumn(name = "order_id", nullable = false)
-    private Order order; // Liên kết với đơn hàng cha
+    private Order order;
 
     @ManyToOne
     @JoinColumn(name = "lesson_id", nullable = false)
-    private Lesson lesson; // Liên kết với bài học được mua
+    private Lesson lesson;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity; // Số lượng (thường là 1 cho các bài học)
+    private Integer quantity;
 
     @Column(name = "price_at_purchase", nullable = false, precision = 10, scale = 2)
-    private BigDecimal priceAtPurchase; // Giá của bài học tại thời điểm mua (để tránh thay đổi giá sau này)
+    private BigDecimal priceAtPurchase;
 
-    // Constructors (nếu không dùng Lombok @Data hoặc cần thêm logic)
     public OrderDetail() {}
 
     public OrderDetail(Order order, Lesson lesson, Integer quantity, BigDecimal priceAtPurchase) {

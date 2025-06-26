@@ -24,9 +24,12 @@ public class Vocabulary {
     private String pronunciation;
 
     @Column(name = "audio_url", columnDefinition = "TEXT")
-    private String audioUrl;
+    private String audioUrl; // URL tới file phát âm của từ
 
-    @Column(name = "writing_prompt", columnDefinition = "TEXT")
+    @Column(name = "image_url", columnDefinition = "TEXT") // Bổ sung: Hình ảnh minh họa cho từ
+    private String imageUrl;
+
+    @Column(name = "writing_prompt", columnDefinition = "TEXT") // Câu gợi ý cho bài tập viết với từ này
     private String writingPrompt;
 
     @Enumerated(EnumType.STRING)

@@ -25,7 +25,7 @@ public class Lesson {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Skill skill;
+    private Skill skill; // Kỹ năng chính của bài học (có thể có nhiều quiz với skill khác nhau)
 
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
@@ -48,7 +48,7 @@ public class Lesson {
     }
 
     public enum Skill {
-        LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR
+        LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR, GENERAL // GENERAL cho các bài học tổng hợp
     }
 
     // Constructors

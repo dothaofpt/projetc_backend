@@ -1,13 +1,16 @@
 package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.Min;
+import org.example.projetc_backend.entity.Vocabulary;
 
 public record FlashcardSearchRequest(
-        Integer lessonId,
+        Integer userId,
+        Integer wordId,
+        Integer setId,
         String word,
         String meaning,
         Boolean isKnown,
-        String difficultyLevel,
+        Vocabulary.DifficultyLevel difficultyLevel,
         @Min(0) Integer page,
         @Min(1) Integer size,
         String sortBy,
