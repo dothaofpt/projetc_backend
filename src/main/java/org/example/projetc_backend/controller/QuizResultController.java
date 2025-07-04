@@ -43,6 +43,25 @@ public class QuizResultController {
     }
 
     /**
+     * Cập nhật kết quả bài kiểm tra hiện có.
+     * Chỉ ADMIN mới có quyền truy cập.
+     * @param resultId ID của kết quả bài kiểm tra cần cập nhật.
+     * @param request DTO chứa thông tin cập nhật (score, durationSeconds).
+     * @return ResponseEntity với QuizResultResponse của kết quả đã cập nhật.
+     */
+    @PutMapping("/{resultId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<QuizResultResponse> updateQuizResult(@PathVariable Integer resultId,
+                                                               @Valid @RequestBody QuizResultRequest request) {
+        try {
+            QuizResultResponse response = quizResultService.updateQuizResult(resultId, request);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /**
      * Lấy kết quả quiz cho một người dùng và một bài quiz cụ thể.
      * Cả USER và ADMIN đều có quyền. USER chỉ có thể xem của chính mình.
      * @param userId ID của người dùng.
@@ -95,8 +114,6 @@ public class QuizResultController {
         }
     }
 
-
-
     /**
      * Tìm kiếm và phân trang kết quả bài kiểm tra dựa trên các tiêu chí tùy chọn.
      * Sử dụng @ModelAttribute để ánh xạ các RequestParam vào DTO.
@@ -114,8 +131,6 @@ public class QuizResultController {
             return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
         }
     }
-
-
 
     /**
      * Xóa một kết quả quiz.

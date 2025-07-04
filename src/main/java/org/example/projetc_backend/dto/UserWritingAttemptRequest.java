@@ -7,10 +7,9 @@ import jakarta.validation.constraints.Min;
 public record UserWritingAttemptRequest(
         @NotNull(message = "User ID is required")
         Integer userId,
-        @NotNull(message = "Question ID is required")
-        Integer questionId,
-        @NotBlank(message = "Original prompt text is required")
-        String originalPromptText,
+        @NotNull(message = "Practice Activity ID is required") // Changed from questionId
+        Integer practiceActivityId,
+        // Removed @NotBlank(message = "Original prompt text is required") String originalPromptText,
         @NotBlank(message = "User written text is required")
         String userWrittenText,
         String grammarFeedback,

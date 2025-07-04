@@ -17,11 +17,8 @@ public class UserWritingAttempt {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "question_id") // Câu hỏi/gợi ý viết (có thể là một WritingPrompt Question)
-    private Question question;
-
-    @Column(name = "original_prompt_text", columnDefinition = "TEXT") // Gợi ý viết gốc
-    private String originalPromptText;
+    @JoinColumn(name = "practice_activity_id", nullable = false) // Đã thay đổi: Liên kết với PracticeActivity
+    private PracticeActivity practiceActivity;
 
     @Column(name = "user_written_text", columnDefinition = "TEXT") // Văn bản người dùng đã viết
     private String userWrittenText;
@@ -35,7 +32,7 @@ public class UserWritingAttempt {
     @Column(name = "cohesion_feedback", columnDefinition = "TEXT") // Phản hồi về mạch lạc (nếu có thể tự động)
     private String cohesionFeedback;
 
-    @Column(name = "overall_score") // Điểm tổng thể của bài viết (nếu có thể tự động chấm hoặc giáo viên chấm)
+    @Column(name = "overall_score") // Điểm tổng thể của bài viết
     private Integer overallScore;
 
     @Column(name = "attempt_date", nullable = false)

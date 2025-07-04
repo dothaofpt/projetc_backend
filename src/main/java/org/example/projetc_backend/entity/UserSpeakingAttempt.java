@@ -17,11 +17,8 @@ public class UserSpeakingAttempt {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "question_id", nullable = false) // Câu hỏi/gợi ý nói
-    private Question question;
-
-    @Column(name = "original_prompt_text", columnDefinition = "TEXT") // Văn bản gốc của gợi ý (ví dụ: câu mẫu để lặp lại)
-    private String originalPromptText;
+    @JoinColumn(name = "practice_activity_id", nullable = false) // Đã thay đổi: Liên kết với PracticeActivity
+    private PracticeActivity practiceActivity;
 
     @Column(name = "user_audio_url", columnDefinition = "TEXT") // URL của bản ghi âm của người dùng
     private String userAudioUrl;

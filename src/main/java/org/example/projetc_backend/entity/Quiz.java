@@ -14,19 +14,28 @@ public class Quiz {
 
     @ManyToOne
     @JoinColumn(name = "lesson_id", nullable = false)
-    private Lesson lesson; // Bài học mà quiz này thuộc về
+    private Lesson lesson;
 
     @Column(length = 255)
     private String title = "";
 
-    @Column
+    // Đã bỏ trường 'Skill' ở đây để tránh trùng lặp và dựa vào QuizType để phân loại bài test
+    // Nếu bạn vẫn muốn có trường Skill ở đây, hãy đổi tên enum để tránh nhầm lẫn với Lesson.Skill hoặc PracticeActivity.ActivitySkill
+
+    @Column(name = "quiz_type", nullable = false) // ĐÃ THÊM: Trường để phân loại bài kiểm tra
     @Enumerated(EnumType.STRING)
-    private Skill skill = Skill.VOCABULARY; // Kỹ năng chính mà quiz này kiểm tra
+    private QuizType quizType;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public enum Skill {
-        LISTENING, SPEAKING, READING, WRITING, VOCABULARY, GRAMMAR
+    public enum QuizType {
+        LISTENING_TEST,
+        SPEAKING_TEST,
+        READING_TEST,
+        WRITING_TEST,
+        GRAMMAR_TEST,
+        VOCABULARY_TEST,
+        COMPREHENSIVE_TEST // Test tổng hợp nhiều kỹ năng
     }
 }

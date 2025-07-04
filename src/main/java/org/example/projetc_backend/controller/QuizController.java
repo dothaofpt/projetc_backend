@@ -2,8 +2,8 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.QuizRequest;
 import org.example.projetc_backend.dto.QuizResponse;
-import org.example.projetc_backend.dto.QuizSearchRequest; // Import DTO tìm kiếm
-import org.example.projetc_backend.dto.QuizPageResponse; // Import DTO phân trang
+import org.example.projetc_backend.dto.QuizSearchRequest;
+import org.example.projetc_backend.dto.QuizPageResponse;
 import org.example.projetc_backend.service.QuizService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,7 +49,7 @@ public class QuizController {
             QuizResponse response = quizService.createQuiz(request);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
 
@@ -65,7 +65,7 @@ public class QuizController {
             QuizResponse response = quizService.getQuizById(quizId);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 
@@ -80,11 +80,11 @@ public class QuizController {
         try {
             List<QuizResponse> responses = quizService.getQuizzesByLessonId(lessonId);
             return new ResponseEntity<>(responses, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
-
 
     /**
      * Tìm kiếm và phân trang các bài kiểm tra dựa trên các tiêu chí tùy chọn.
@@ -99,10 +99,9 @@ public class QuizController {
             QuizPageResponse response = quizService.searchQuizzes(searchRequest);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
-
 
     /**
      * Cập nhật thông tin của một bài kiểm tra.
@@ -119,7 +118,7 @@ public class QuizController {
             QuizResponse response = quizService.updateQuiz(quizId, request);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
 
@@ -136,7 +135,7 @@ public class QuizController {
             quizService.deleteQuiz(quizId);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 }

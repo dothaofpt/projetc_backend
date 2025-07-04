@@ -13,16 +13,19 @@ import java.util.List;
 @Repository
 public interface UserSpeakingAttemptRepository extends JpaRepository<UserSpeakingAttempt, Integer> {
     List<UserSpeakingAttempt> findByUserUserId(Integer userId);
-    List<UserSpeakingAttempt> findByQuestionQuestionId(Integer questionId);
+    // Đã thay đổi: Liên kết với PracticeActivity
+    List<UserSpeakingAttempt> findByPracticeActivityActivityId(Integer practiceActivityId);
 
     @Query("SELECT usa FROM UserSpeakingAttempt usa WHERE " +
             "(:userId IS NULL OR usa.user.userId = :userId) AND " +
-            "(:questionId IS NULL OR usa.question.questionId = :questionId) AND " +
+            // Đã thay đổi: Liên kết với PracticeActivity
+            "(:practiceActivityId IS NULL OR usa.practiceActivity.activityId = :practiceActivityId) AND " +
             "(:minOverallScore IS NULL OR usa.overallScore >= :minOverallScore) AND " +
             "(:maxOverallScore IS NULL OR usa.overallScore <= :maxOverallScore)")
     Page<UserSpeakingAttempt> searchSpeakingAttempts(
             @Param("userId") Integer userId,
-            @Param("questionId") Integer questionId,
+            // Đã thay đổi: Tham số là practiceActivityId
+            @Param("practiceActivityId") Integer practiceActivityId,
             @Param("minOverallScore") Integer minOverallScore,
             @Param("maxOverallScore") Integer maxOverallScore,
             Pageable pageable);

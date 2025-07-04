@@ -17,17 +17,11 @@ public class UserListeningAttempt {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "question_id", nullable = false) // Câu hỏi liên quan đến bài nghe (nếu có)
-    private Question question;
-
-    @Column(name = "audio_material_url", columnDefinition = "TEXT") // URL của đoạn audio người dùng đã nghe
-    private String audioMaterialUrl;
+    @JoinColumn(name = "practice_activity_id", nullable = false) // Đã thay đổi: Liên kết với PracticeActivity
+    private PracticeActivity practiceActivity;
 
     @Column(name = "user_transcribed_text", columnDefinition = "TEXT") // Văn bản người dùng đã gõ
     private String userTranscribedText;
-
-    @Column(name = "actual_transcript_text", columnDefinition = "TEXT") // Văn bản chính xác
-    private String actualTranscriptText;
 
     @Column(name = "accuracy_score") // Điểm chính xác (ví dụ: %)
     private Integer accuracyScore;

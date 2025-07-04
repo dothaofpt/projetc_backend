@@ -2,8 +2,8 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.QuizRequest;
 import org.example.projetc_backend.dto.QuizResponse;
-import org.example.projetc_backend.dto.QuizSearchRequest;
-import org.example.projetc_backend.dto.QuizPageResponse;
+import org.example.projetc_backend.dto.QuizSearchRequest; // Giữ nguyên
+import org.example.projetc_backend.dto.QuizPageResponse; // Giữ nguyên
 import org.example.projetc_backend.entity.Lesson;
 import org.example.projetc_backend.entity.Quiz;
 import org.example.projetc_backend.repository.LessonRepository;
@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional // Đặt Transactional ở cấp độ class
 public class QuizService {
     private static final Logger logger = LoggerFactory.getLogger(QuizService.class);
     private final QuizRepository quizRepository;
@@ -39,13 +40,13 @@ public class QuizService {
      * @return QuizResponse chứa thông tin của bài kiểm tra đã tạo.
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ hoặc không tìm thấy Lesson.
      */
-    @Transactional
     public QuizResponse createQuiz(QuizRequest request) {
-        if (request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
-            throw new IllegalArgumentException("Lesson ID, tiêu đề và kỹ năng của bài kiểm tra là bắt buộc.");
+        // Đã thay đổi: skill() thành quizType()
+        if (request == null || request.lessonId() == null || request.title() == null || request.quizType() == null) {
+            throw new IllegalArgumentException("Lesson ID, tiêu đề và loại bài kiểm tra là bắt buộc.");
         }
 
-        logger.info("Processing createQuiz request for skill: {}", request.skill());
+        logger.info("Đang xử lý yêu cầu tạo Quiz với loại: {}", request.quizType());
 
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
@@ -58,10 +59,8 @@ public class QuizService {
         Quiz quiz = new Quiz();
         quiz.setLesson(lesson);
         quiz.setTitle(request.title().trim());
-
-        // SỬA LỖI: request.skill() đã là enum, không cần toUpperCase()
-        quiz.setSkill(request.skill());
-
+        // Đã thay đổi: setSkill() thành setQuizType()
+        quiz.setQuizType(request.quizType());
         quiz.setCreatedAt(LocalDateTime.now());
 
         quiz = quizRepository.save(quiz);
@@ -110,7 +109,7 @@ public class QuizService {
      */
     @Transactional(readOnly = true)
     public List<QuizResponse> getAllQuizzes() {
-        logger.info("Fetching all quizzes.");
+        logger.info("Đang lấy tất cả quizzes.");
         return quizRepository.findAll().stream()
                 .map(this::mapToQuizResponse)
                 .collect(Collectors.toList());
@@ -119,7 +118,7 @@ public class QuizService {
     /**
      * Tìm kiếm và phân trang các bài kiểm tra.
      *
-     * @param request DTO chứa các tiêu chí tìm kiếm (lessonId, title, skill) và thông tin phân trang/sắp xếp.
+     * @param request DTO chứa các tiêu chí tìm kiếm (lessonId, title, quizType) và thông tin phân trang/sắp xếp.
      * @return Trang các QuizResponse.
      * @throws IllegalArgumentException Nếu Search request trống.
      */
@@ -136,7 +135,7 @@ public class QuizService {
         Page<Quiz> quizPage = quizRepository.searchQuizzes(
                 request.lessonId(),
                 request.title(),
-                request.skill(),
+                request.quizType(), // Đã thay đổi: skill() thành quizType()
                 pageable
         );
 
@@ -162,11 +161,12 @@ public class QuizService {
      */
     @Transactional
     public QuizResponse updateQuiz(Integer quizId, QuizRequest request) {
-        if (quizId == null || request == null || request.lessonId() == null || request.title() == null || request.skill() == null) {
-            throw new IllegalArgumentException("Quiz ID, Lesson ID, tiêu đề và kỹ năng của bài kiểm tra là bắt buộc.");
+        // Đã thay đổi: skill() thành quizType()
+        if (quizId == null || request == null || request.lessonId() == null || request.title() == null || request.quizType() == null) {
+            throw new IllegalArgumentException("Quiz ID, Lesson ID, tiêu đề và loại bài kiểm tra là bắt buộc.");
         }
 
-        logger.info("Updating Quiz with ID: {}, skill: {}", quizId, request.skill());
+        logger.info("Đang cập nhật Quiz với ID: {}, loại: {}", quizId, request.quizType());
 
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
@@ -182,9 +182,8 @@ public class QuizService {
 
         quiz.setLesson(lesson);
         quiz.setTitle(request.title().trim());
-
-        // SỬA LỖI: request.skill() đã là enum, không cần toUpperCase()
-        quiz.setSkill(request.skill());
+        // Đã thay đổi: setSkill() thành setQuizType()
+        quiz.setQuizType(request.quizType());
 
         quiz = quizRepository.save(quiz);
 
@@ -218,7 +217,7 @@ public class QuizService {
                 quiz.getQuizId(),
                 quiz.getLesson() != null ? quiz.getLesson().getLessonId() : null,
                 quiz.getTitle(),
-                quiz.getSkill(),
+                quiz.getQuizType(), // Đã thay đổi: getSkill() thành getQuizType()
                 quiz.getCreatedAt()
         );
     }

@@ -2,17 +2,18 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.UserWritingAttemptRequest;
 import org.example.projetc_backend.dto.UserWritingAttemptResponse;
+import org.example.projetc_backend.dto.UserWritingAttemptSearchRequest; // Import DTO mới
 import org.example.projetc_backend.entity.UserWritingAttempt;
 import org.example.projetc_backend.entity.User;
-import org.example.projetc_backend.entity.Question; // Import Question entity
+import org.example.projetc_backend.entity.PracticeActivity;
 import org.example.projetc_backend.repository.UserWritingAttemptRepository;
 import org.example.projetc_backend.repository.UserRepository;
-import org.example.projetc_backend.repository.QuestionRepository; // Import QuestionRepository
+import org.example.projetc_backend.repository.PracticeActivityRepository;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page; // Import Page
+import org.springframework.data.domain.PageRequest; // Import PageRequest
+import org.springframework.data.domain.Pageable; // Import Pageable
+import org.springframework.data.domain.Sort; // Import Sort
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,14 +28,14 @@ public class UserWritingAttemptService {
 
     private final UserWritingAttemptRepository userWritingAttemptRepository;
     private final UserRepository userRepository;
-    private final QuestionRepository questionRepository; // Repository cho Question entity
+    private final PracticeActivityRepository practiceActivityRepository;
 
     public UserWritingAttemptService(UserWritingAttemptRepository userWritingAttemptRepository,
                                      UserRepository userRepository,
-                                     QuestionRepository questionRepository) {
+                                     PracticeActivityRepository practiceActivityRepository) {
         this.userWritingAttemptRepository = userWritingAttemptRepository;
         this.userRepository = userRepository;
-        this.questionRepository = questionRepository;
+        this.practiceActivityRepository = practiceActivityRepository;
     }
 
     /**
@@ -44,10 +45,9 @@ public class UserWritingAttemptService {
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ.
      */
     public UserWritingAttemptResponse saveWritingAttempt(UserWritingAttemptRequest request) {
-        if (request == null || request.userId() == null || request.questionId() == null ||
-                request.originalPromptText() == null || request.originalPromptText().trim().isEmpty() ||
+        if (request == null || request.userId() == null || request.practiceActivityId() == null ||
                 request.userWrittenText() == null || request.userWrittenText().trim().isEmpty()) {
-            throw new IllegalArgumentException("Các trường bắt buộc (userId, questionId, originalPromptText, userWrittenText) không được để trống.");
+            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userWrittenText) không được để trống.");
         }
         if (request.overallScore() != null && (request.overallScore() < 0 || request.overallScore() > 100)) {
             throw new IllegalArgumentException("Điểm tổng thể phải nằm trong khoảng từ 0 đến 100.");
@@ -56,27 +56,63 @@ public class UserWritingAttemptService {
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
 
-        // questionId trong UserWritingAttempt có thể null, kiểm tra nếu nó không null thì tìm question
-        Question question = null;
-        if (request.questionId() != null) {
-            question = questionRepository.findById(request.questionId())
-                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy câu hỏi với ID: " + request.questionId()));
-        }
-
+        PracticeActivity practiceActivity = practiceActivityRepository.findById(request.practiceActivityId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + request.practiceActivityId()));
 
         UserWritingAttempt attempt = new UserWritingAttempt();
         attempt.setUser(user);
-        attempt.setQuestion(question); // Có thể là null
-        attempt.setOriginalPromptText(request.originalPromptText().trim());
+        attempt.setPracticeActivity(practiceActivity);
         attempt.setUserWrittenText(request.userWrittenText().trim());
         attempt.setGrammarFeedback(request.grammarFeedback() != null ? request.grammarFeedback().trim() : null);
         attempt.setSpellingFeedback(request.spellingFeedback() != null ? request.spellingFeedback().trim() : null);
         attempt.setCohesionFeedback(request.cohesionFeedback() != null ? request.cohesionFeedback().trim() : null);
         attempt.setOverallScore(request.overallScore());
-        attempt.setAttemptDate(LocalDateTime.now()); // Đặt thời gian tạo
+        attempt.setAttemptDate(LocalDateTime.now());
 
         attempt = userWritingAttemptRepository.save(attempt);
         return mapToUserWritingAttemptResponse(attempt);
+    }
+
+    /**
+     * Cập nhật một lần thử viết hiện có của người dùng.
+     * @param attemptId ID của lần thử viết cần cập nhật.
+     * @param request Dữ liệu yêu cầu cập nhật.
+     * @return UserWritingAttemptResponse của lần thử viết đã cập nhật.
+     * @throws IllegalArgumentException nếu dữ liệu không hợp lệ hoặc không tìm thấy lần thử.
+     */
+    public UserWritingAttemptResponse updateWritingAttempt(Integer attemptId, UserWritingAttemptRequest request) {
+        if (attemptId == null) {
+            throw new IllegalArgumentException("Attempt ID không được để trống.");
+        }
+        if (request == null || request.userId() == null || request.practiceActivityId() == null ||
+                request.userWrittenText() == null || request.userWrittenText().trim().isEmpty()) {
+            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userWrittenText) không được để trống.");
+        }
+        if (request.overallScore() != null && (request.overallScore() < 0 || request.overallScore() > 100)) {
+            throw new IllegalArgumentException("Điểm tổng thể phải nằm trong khoảng từ 0 đến 100.");
+        }
+
+        UserWritingAttempt existingAttempt = userWritingAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lần thử viết với ID: " + attemptId));
+
+        // Kiểm tra user và practiceActivity có tồn tại không
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
+        PracticeActivity practiceActivity = practiceActivityRepository.findById(request.practiceActivityId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + request.practiceActivityId()));
+
+        // Cập nhật các trường
+        existingAttempt.setUser(user);
+        existingAttempt.setPracticeActivity(practiceActivity);
+        existingAttempt.setUserWrittenText(request.userWrittenText().trim());
+        existingAttempt.setGrammarFeedback(request.grammarFeedback() != null ? request.grammarFeedback().trim() : null);
+        existingAttempt.setSpellingFeedback(request.spellingFeedback() != null ? request.spellingFeedback().trim() : null);
+        existingAttempt.setCohesionFeedback(request.cohesionFeedback() != null ? request.cohesionFeedback().trim() : null);
+        existingAttempt.setOverallScore(request.overallScore());
+        // Không cập nhật attemptDate ở đây vì nó là thời gian tạo ban đầu
+
+        existingAttempt = userWritingAttemptRepository.save(existingAttempt); // Lưu lại bản cập nhật
+        return mapToUserWritingAttemptResponse(existingAttempt);
     }
 
     /**
@@ -116,24 +152,55 @@ public class UserWritingAttemptService {
     }
 
     /**
-     * Lấy tất cả các lần thử viết cho một câu hỏi cụ thể.
-     * @param questionId ID của câu hỏi.
+     * Lấy tất cả các lần thử viết cho một hoạt động luyện tập cụ thể.
+     * @param practiceActivityId ID của hoạt động luyện tập.
      * @return Danh sách UserWritingAttemptResponse.
-     * @throws IllegalArgumentException nếu questionId không hợp lệ.
+     * @throws IllegalArgumentException nếu practiceActivityId không hợp lệ.
      */
     @Transactional(readOnly = true)
-    public List<UserWritingAttemptResponse> getWritingAttemptsByQuestion(Integer questionId) {
-        if (questionId == null) {
-            throw new IllegalArgumentException("Question ID không được để trống.");
+    public List<UserWritingAttemptResponse> getWritingAttemptsByPracticeActivity(Integer practiceActivityId) {
+        if (practiceActivityId == null) {
+            throw new IllegalArgumentException("Practice Activity ID không được để trống.");
         }
-        if (!questionRepository.existsById(questionId)) {
-            throw new IllegalArgumentException("Không tìm thấy câu hỏi với ID: " + questionId);
+        if (!practiceActivityRepository.existsById(practiceActivityId)) {
+            throw new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + practiceActivityId);
         }
 
-        return userWritingAttemptRepository.findByQuestionQuestionId(questionId).stream()
+        return userWritingAttemptRepository.findByPracticeActivityActivityId(practiceActivityId).stream()
                 .map(this::mapToUserWritingAttemptResponse)
                 .collect(Collectors.toList());
     }
+
+
+
+    /**
+     * Tìm kiếm và phân trang các lần thử viết của người dùng.
+     * @param searchRequest DTO chứa các tiêu chí tìm kiếm và thông tin phân trang.
+     * @return Trang chứa UserWritingAttemptResponse.
+     */
+    @Transactional(readOnly = true)
+    public Page<UserWritingAttemptResponse> searchAndPaginateWritingAttempts(UserWritingAttemptSearchRequest searchRequest) {
+        // Tạo đối tượng Pageable từ DTO tìm kiếm
+        Pageable pageable = PageRequest.of(
+                searchRequest.page(),
+                searchRequest.size(),
+                Sort.by("attemptDate").descending() // Sắp xếp theo ngày thử giảm dần
+        );
+
+        // Gọi phương thức tìm kiếm từ Repository
+        Page<UserWritingAttempt> attemptsPage = userWritingAttemptRepository.searchWritingAttempts(
+                searchRequest.userId(),
+                searchRequest.practiceActivityId(),
+                searchRequest.minOverallScore(),
+                searchRequest.maxOverallScore(),
+                pageable
+        );
+
+        // Ánh xạ Page của Entity sang Page của DTO Response
+        return attemptsPage.map(this::mapToUserWritingAttemptResponse);
+    }
+
+
 
     /**
      * Xóa một lần thử viết của người dùng.
@@ -159,8 +226,7 @@ public class UserWritingAttemptService {
         return new UserWritingAttemptResponse(
                 attempt.getAttemptId(),
                 attempt.getUser().getUserId(),
-                (attempt.getQuestion() != null) ? attempt.getQuestion().getQuestionId() : null, // Question có thể null
-                attempt.getOriginalPromptText(),
+                attempt.getPracticeActivity() != null ? attempt.getPracticeActivity().getActivityId() : null,
                 attempt.getUserWrittenText(),
                 attempt.getGrammarFeedback(),
                 attempt.getSpellingFeedback(),

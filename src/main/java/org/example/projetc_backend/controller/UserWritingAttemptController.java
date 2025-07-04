@@ -2,7 +2,9 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.UserWritingAttemptRequest;
 import org.example.projetc_backend.dto.UserWritingAttemptResponse;
+import org.example.projetc_backend.dto.UserWritingAttemptSearchRequest; // Import DTO tìm kiếm mới
 import org.example.projetc_backend.service.UserWritingAttemptService;
+import org.springframework.data.domain.Page; // Import Page
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,18 +13,23 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 
+// Thêm các import cần thiết cho Logger
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.servlet.http.HttpServletRequest; // Import để lấy thông tin request
+
 @RestController
 @RequestMapping("/api/writing-attempts")
 @CrossOrigin(origins = {"http://localhost:4200", "http://localhost:8000", "http://localhost:8080", "http://localhost:61299"})
 public class UserWritingAttemptController {
 
-    private final UserWritingAttemptService userWritingAttemptService;
-    // Bổ sung UserSecurityService nếu bạn muốn triển khai kiểm tra quyền sở hữu chi tiết hơn
-    // private final UserSecurityService userSecurityService;
+    // Khởi tạo Logger cho class này
+    private static final Logger logger = LoggerFactory.getLogger(UserWritingAttemptController.class);
 
-    public UserWritingAttemptController(UserWritingAttemptService userWritingAttemptService /*, UserSecurityService userSecurityService*/) {
+    private final UserWritingAttemptService userWritingAttemptService;
+
+    public UserWritingAttemptController(UserWritingAttemptService userWritingAttemptService) {
         this.userWritingAttemptService = userWritingAttemptService;
-        // this.userSecurityService = userSecurityService;
     }
 
     /**
@@ -33,12 +40,54 @@ public class UserWritingAttemptController {
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
-    public ResponseEntity<UserWritingAttemptResponse> saveWritingAttempt(@Valid @RequestBody UserWritingAttemptRequest request) {
+    public ResponseEntity<UserWritingAttemptResponse> saveWritingAttempt(@Valid @RequestBody UserWritingAttemptRequest request,
+                                                                         HttpServletRequest httpRequest) { // Thêm HttpServletRequest
+        logger.info("Received POST request to /api/writing-attempts from IP: {}. Request body: {}",
+                httpRequest.getRemoteAddr(), request); // Log request body
         try {
             UserWritingAttemptResponse response = userWritingAttemptService.saveWritingAttempt(request);
+            logger.info("Successfully saved writing attempt with ID: {}. User ID: {}", response.attemptId(), response.userId());
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            logger.warn("400 Bad Request for POST /api/writing-attempts from IP: {}. Error: {}",
+                    httpRequest.getRemoteAddr(), e.getMessage());
+            logger.debug("Details for 400 error on POST /api/writing-attempts: Request body: {}", request); // Thêm debug cho request body
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            logger.error("500 Internal Server Error for POST /api/writing-attempts from IP: {}. Error: {}",
+                    httpRequest.getRemoteAddr(), e.getMessage(), e); // Log full stack trace
+            logger.error("Details for 500 error on POST /api/writing-attempts: Request body: {}", request); // Log request body
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    /**
+     * Cập nhật một lần thử viết hiện có của người dùng.
+     * Chỉ ADMIN mới có quyền thực hiện.
+     * @param attemptId ID của lần thử viết cần cập nhật.
+     * @param request DTO chứa thông tin cập nhật lần thử viết.
+     * @return ResponseEntity với UserWritingAttemptResponse của lần thử đã cập nhật.
+     */
+    @PutMapping("/{attemptId}")
+    @PreAuthorize("hasRole('ADMIN')") // Chỉ ADMIN mới có quyền cập nhật dữ liệu này
+    public ResponseEntity<UserWritingAttemptResponse> updateWritingAttempt(
+            @PathVariable Integer attemptId,
+            @Valid @RequestBody UserWritingAttemptRequest request,
+            HttpServletRequest httpRequest) { // Thêm HttpServletRequest
+        logger.info("Received PUT request to /api/writing-attempts/{} from IP: {}. Request body: {}",
+                attemptId, httpRequest.getRemoteAddr(), request); // Log request body
+        try {
+            UserWritingAttemptResponse response = userWritingAttemptService.updateWritingAttempt(attemptId, request);
+            logger.info("Successfully updated writing attempt with ID: {}", attemptId);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            logger.warn("400 Bad Request/404 Not Found for PUT /api/writing-attempts/{} from IP: {}. Error: {}",
+                    attemptId, httpRequest.getRemoteAddr(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null); // Có thể là 404 nếu không tìm thấy ID
+        } catch (Exception e) {
+            logger.error("500 Internal Server Error for PUT /api/writing-attempts/{} from IP: {}. Error: {}",
+                    attemptId, httpRequest.getRemoteAddr(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -52,16 +101,16 @@ public class UserWritingAttemptController {
      */
     @GetMapping("/{attemptId}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')") // Tạm thời cho phép USER, cần thêm logic kiểm tra sở hữu
-    public ResponseEntity<UserWritingAttemptResponse> getWritingAttemptById(@PathVariable Integer attemptId) {
+    public ResponseEntity<UserWritingAttemptResponse> getWritingAttemptById(@PathVariable Integer attemptId,
+                                                                            HttpServletRequest httpRequest) { // Thêm HttpServletRequest
+        logger.info("Received GET request to /api/writing-attempts/{} from IP: {}", attemptId, httpRequest.getRemoteAddr());
         try {
             UserWritingAttemptResponse response = userWritingAttemptService.getWritingAttemptById(attemptId);
-            // Thêm kiểm tra quyền sở hữu nếu người dùng là USER và không phải ADMIN
-            // if (userSecurityService.isUser() && !userSecurityService.isAdmin() && !userSecurityService.isOwnerOfWritingAttempt(attemptId)) {
-            //     return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-            // }
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            logger.warn("404 Not Found for GET /api/writing-attempts/{} from IP: {}. Error: {}",
+                    attemptId, httpRequest.getRemoteAddr(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 
@@ -72,32 +121,93 @@ public class UserWritingAttemptController {
      * @return ResponseEntity với danh sách UserWritingAttemptResponse.
      */
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('ADMIN') or authentication.principal.id == #userId") // Giả định principal có trường 'id'
-    public ResponseEntity<List<UserWritingAttemptResponse>> getWritingAttemptsByUser(@PathVariable Integer userId) {
+    @PreAuthorize("hasRole('ADMIN') or authentication.principal.id == #userId")
+    public ResponseEntity<List<UserWritingAttemptResponse>> getWritingAttemptsByUser(@PathVariable Integer userId,
+                                                                                     HttpServletRequest httpRequest) { // Thêm HttpServletRequest
+        logger.info("Received GET request to /api/writing-attempts/user/{} from IP: {}", userId, httpRequest.getRemoteAddr());
         try {
             List<UserWritingAttemptResponse> responses = userWritingAttemptService.getWritingAttemptsByUser(userId);
             return new ResponseEntity<>(responses, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            logger.warn("404 Not Found for GET /api/writing-attempts/user/{} from IP: {}. Error: {}",
+                    userId, httpRequest.getRemoteAddr(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 
     /**
-     * Lấy tất cả các lần thử viết cho một câu hỏi cụ thể.
+     * Lấy tất cả các lần thử viết cho một hoạt động luyện tập cụ thể.
      * ADMIN có quyền xem. Có thể mở public nếu cần cho mục đích thống kê hoặc hiển thị.
-     * @param questionId ID của câu hỏi.
+     * @param practiceActivityId ID của hoạt động luyện tập.
      * @return ResponseEntity với danh sách UserWritingAttemptResponse.
      */
-    @GetMapping("/question/{questionId}")
-    @PreAuthorize("hasRole('ADMIN')") // Chỉ ADMIN hoặc có thể mở rộng quyền
-    public ResponseEntity<List<UserWritingAttemptResponse>> getWritingAttemptsByQuestion(@PathVariable Integer questionId) {
+    @GetMapping("/practice-activity/{practiceActivityId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    public ResponseEntity<List<UserWritingAttemptResponse>> getWritingAttemptsByPracticeActivity(@PathVariable Integer practiceActivityId,
+                                                                                                 HttpServletRequest httpRequest) { // Thêm HttpServletRequest
+        logger.info("Received GET request to /api/writing-attempts/practice-activity/{} from IP: {}", practiceActivityId, httpRequest.getRemoteAddr());
         try {
-            List<UserWritingAttemptResponse> responses = userWritingAttemptService.getWritingAttemptsByQuestion(questionId);
+            List<UserWritingAttemptResponse> responses = userWritingAttemptService.getWritingAttemptsByPracticeActivity(practiceActivityId);
             return new ResponseEntity<>(responses, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            logger.warn("404 Not Found for GET /api/writing-attempts/practice-activity/{} from IP: {}. Error: {}",
+                    practiceActivityId, httpRequest.getRemoteAddr(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
+
+
+
+    /**
+     * Tìm kiếm và phân trang các lần thử viết của người dùng.
+     * Cho phép lọc theo userId, practiceActivityId, minOverallScore, maxOverallScore, và phân trang.
+     * Chỉ ADMIN mới có quyền truy cập.
+     * @param userId ID người dùng để lọc (tùy chọn).
+     * @param practiceActivityId ID hoạt động luyện tập để lọc (tùy chọn).
+     * @param minOverallScore Điểm tổng thể tối thiểu (tùy chọn).
+     * @param maxOverallScore Điểm tổng thể tối đa (tùy chọn).
+     * @param page Số trang (mặc định là 0).
+     * @param size Kích thước trang (mặc định là 10).
+     * @return ResponseEntity chứa Page của UserWritingAttemptResponse.
+     */
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN')") // Chỉ ADMIN mới có thể tìm kiếm tất cả
+    public ResponseEntity<Page<UserWritingAttemptResponse>> searchWritingAttempts(
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) Integer practiceActivityId,
+            @RequestParam(required = false) Integer minOverallScore,
+            @RequestParam(required = false) Integer maxOverallScore,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            HttpServletRequest httpRequest) {
+        logger.info("Received GET request to /api/writing-attempts/search from IP: {}. Params: userId={}, practiceActivityId={}, minOverallScore={}, maxOverallScore={}, page={}, size={}",
+                httpRequest.getRemoteAddr(), userId, practiceActivityId, minOverallScore, maxOverallScore, page, size);
+        try {
+            UserWritingAttemptSearchRequest searchRequest = UserWritingAttemptSearchRequest.builder()
+                    .userId(userId)
+                    .practiceActivityId(practiceActivityId)
+                    .minOverallScore(minOverallScore)
+                    .maxOverallScore(maxOverallScore)
+                    .page(page)
+                    .size(size)
+                    .build();
+
+            Page<UserWritingAttemptResponse> responsePage = userWritingAttemptService.searchAndPaginateWritingAttempts(searchRequest);
+            logger.info("Successfully retrieved {} writing attempts (page {} of {}) matching criteria.",
+                    responsePage.getNumberOfElements(), responsePage.getNumber(), responsePage.getTotalPages());
+            return new ResponseEntity<>(responsePage, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            logger.warn("400 Bad Request for GET /api/writing-attempts/search from IP: {}. Error: {}",
+                    httpRequest.getRemoteAddr(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            logger.error("500 Internal Server Error for GET /api/writing-attempts/search from IP: {}. Error: {}",
+                    httpRequest.getRemoteAddr(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+
 
     /**
      * Xóa một lần thử viết.
@@ -107,12 +217,17 @@ public class UserWritingAttemptController {
      */
     @DeleteMapping("/{attemptId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteWritingAttempt(@PathVariable Integer attemptId) {
+    public ResponseEntity<Void> deleteWritingAttempt(@PathVariable Integer attemptId,
+                                                     HttpServletRequest httpRequest) { // Thêm HttpServletRequest
+        logger.info("Received DELETE request to /api/writing-attempts/{} from IP: {}", attemptId, httpRequest.getRemoteAddr());
         try {
             userWritingAttemptService.deleteWritingAttempt(attemptId);
+            logger.info("Successfully deleted writing attempt with ID: {}", attemptId);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            logger.warn("404 Not Found for DELETE /api/writing-attempts/{} from IP: {}. Error: {}",
+                    attemptId, httpRequest.getRemoteAddr(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
     }
 }

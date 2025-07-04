@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 public record UserWritingAttemptResponse(
         Integer attemptId,
         Integer userId,
-        Integer questionId,
-        String originalPromptText,
+        Integer practiceActivityId, // Changed from questionId
+        // Removed String originalPromptText,
         String userWrittenText,
         String grammarFeedback,
         String spellingFeedback,

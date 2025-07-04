@@ -13,17 +13,20 @@ import java.util.List;
 @Repository
 public interface UserListeningAttemptRepository extends JpaRepository<UserListeningAttempt, Integer> {
     List<UserListeningAttempt> findByUserUserId(Integer userId);
-    List<UserListeningAttempt> findByQuestionQuestionId(Integer questionId);
+    // Đã thay đổi: Liên kết với PracticeActivity
+    List<UserListeningAttempt> findByPracticeActivityActivityId(Integer practiceActivityId);
 
     @Query("SELECT ula FROM UserListeningAttempt ula WHERE " +
             "(:userId IS NULL OR ula.user.userId = :userId) AND " +
-            "(:questionId IS NULL OR ula.question.questionId = :questionId) AND " +
+            // Đã thay đổi: Liên kết với PracticeActivity
+            "(:practiceActivityId IS NULL OR ula.practiceActivity.activityId = :practiceActivityId) AND " +
             "(:minAccuracyScore IS NULL OR ula.accuracyScore >= :minAccuracyScore) AND " +
             "(:maxAccuracyScore IS NULL OR ula.accuracyScore <= :maxAccuracyScore)")
     Page<UserListeningAttempt> searchListeningAttempts(
             @Param("userId") Integer userId,
-            @Param("questionId") Integer questionId,
+            // Đã thay đổi: Tham số là practiceActivityId
+            @Param("practiceActivityId") Integer practiceActivityId,
             @Param("minAccuracyScore") Integer minAccuracyScore,
             @Param("maxAccuracyScore") Integer maxAccuracyScore,
-            Pageable pageable);
+            Pageable pageable); // Tham số Pageable đã có sẵn
 }

@@ -34,8 +34,15 @@ public class ProgressService {
         this.lessonRepository = lessonRepository;
     }
 
+    /**
+     * Tạo mới một bản ghi tiến độ.
+     * @param request DTO chứa thông tin để tạo tiến độ mới.
+     * @return ProgressResponse của bản ghi đã tạo.
+     * @throws IllegalArgumentException Nếu dữ liệu không hợp lệ hoặc tiến độ đã tồn tại cho cặp user-lesson-activity.
+     */
     @Transactional
-    public ProgressResponse updateProgress(ProgressRequest request) {
+    public ProgressResponse createProgress(ProgressRequest request) {
+        // Validation cơ bản
         if (request == null || request.userId() == null || request.lessonId() == null || request.activityType() == null || request.status() == null) {
             throw new IllegalArgumentException("Request, userId, lessonId, activityType, hoặc status không được để trống.");
         }
@@ -43,26 +50,75 @@ public class ProgressService {
             throw new IllegalArgumentException("Tỷ lệ hoàn thành phải từ 0 đến 100.");
         }
 
+        // Kiểm tra xem đã tồn tại bản ghi cho cặp user-lesson-activity này chưa
+        Optional<Progress> existingProgress = progressRepository.findByUserUserIdAndLessonLessonIdAndActivityType(
+                request.userId(),
+                request.lessonId(),
+                request.activityType()
+        );
+
+        if (existingProgress.isPresent()) {
+            throw new IllegalArgumentException("Tiến độ cho người dùng này, bài học này và loại hoạt động này đã tồn tại. Vui lòng sử dụng cập nhật.");
+        }
+
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
 
-        Progress.ActivityType activityTypeEnum = request.activityType();
-        Progress.Status statusEnum = request.status();
-
-        Optional<Progress> existingProgress = progressRepository.findByUserUserIdAndLessonLessonIdAndActivityType(
-                request.userId(),
-                request.lessonId(),
-                activityTypeEnum
-        );
-
-        Progress progress = existingProgress.orElse(new Progress());
+        Progress progress = new Progress(); // Tạo một đối tượng Progress MỚI
         progress.setUser(user);
         progress.setLesson(lesson);
-        progress.setActivityType(activityTypeEnum);
-        progress.setStatus(statusEnum);
+        progress.setActivityType(request.activityType());
+        progress.setStatus(request.status());
         progress.setCompletionPercentage(request.completionPercentage());
+        progress.setLastUpdated(LocalDateTime.now()); // Hoặc để JPA tự động xử lý (nếu bạn có @PreUpdate)
+
+        progress = progressRepository.save(progress);
+        return mapToProgressResponse(progress);
+    }
+
+    /**
+     * Cập nhật một bản ghi tiến độ hiện có.
+     * @param progressId ID của tiến độ cần cập nhật.
+     * @param request DTO chứa thông tin để cập nhật tiến độ.
+     * @return ProgressResponse của bản ghi đã cập nhật.
+     * @throws IllegalArgumentException Nếu ID không tồn tại, dữ liệu không hợp lệ, hoặc cố gắng thay đổi các khóa chính.
+     */
+    @Transactional
+    public ProgressResponse updateProgress(Integer progressId, ProgressRequest request) {
+        if (progressId == null) {
+            throw new IllegalArgumentException("Progress ID không được để trống để cập nhật.");
+        }
+        if (request == null || request.userId() == null || request.lessonId() == null || request.activityType() == null || request.status() == null) {
+            throw new IllegalArgumentException("Request, userId, lessonId, activityType, hoặc status không được để trống.");
+        }
+        if (request.completionPercentage() < 0 || request.completionPercentage() > 100) {
+            throw new IllegalArgumentException("Tỷ lệ hoàn thành phải từ 0 đến 100.");
+        }
+
+        Progress progress = progressRepository.findById(progressId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tiến độ với ID: " + progressId));
+
+        // Tùy chọn: Kiểm tra xem userId, lessonId, activityType có bị thay đổi không.
+        // Thường thì các trường này không nên thay đổi khi cập nhật.
+        if (!progress.getUser().getUserId().equals(request.userId()) ||
+                !progress.getLesson().getLessonId().equals(request.lessonId()) ||
+                !progress.getActivityType().equals(request.activityType())) {
+            throw new IllegalArgumentException("Không thể thay đổi userId, lessonId hoặc activityType khi cập nhật tiến độ.");
+        }
+
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
+        Lesson lesson = lessonRepository.findById(request.lessonId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài học với ID: " + request.lessonId()));
+
+        progress.setUser(user);
+        progress.setLesson(lesson);
+        progress.setActivityType(request.activityType()); // Vẫn cập nhật để đảm bảo tính đồng bộ, mặc dù đã kiểm tra không đổi
+        progress.setStatus(request.status());
+        progress.setCompletionPercentage(request.completionPercentage());
+        progress.setLastUpdated(LocalDateTime.now()); // Cập nhật thời gian
 
         progress = progressRepository.save(progress);
         return mapToProgressResponse(progress);
@@ -181,8 +237,6 @@ public class ProgressService {
         progressRepository.deleteById(progressId);
     }
 
-
-
     /**
      * Tìm kiếm và phân trang các bản ghi tiến độ dựa trên các tiêu chí tùy chọn.
      * @param request DTO chứa các tiêu chí tìm kiếm (userId, lessonId, activityType, status, minCompletionPercentage, maxCompletionPercentage) và thông tin phân trang/sắp xếp.
@@ -203,8 +257,8 @@ public class ProgressService {
                 request.lessonId(),
                 request.activityType(),
                 request.status(),
-                request.minCompletionPercentage(), // <-- Thêm tham số này
-                request.maxCompletionPercentage(), // <-- Thêm tham số này
+                request.minCompletionPercentage(),
+                request.maxCompletionPercentage(),
                 pageable
         );
 
@@ -220,8 +274,6 @@ public class ProgressService {
                 progressPage.getSize()
         );
     }
-
-
 
     private ProgressResponse mapToProgressResponse(Progress progress) {
         return new ProgressResponse(

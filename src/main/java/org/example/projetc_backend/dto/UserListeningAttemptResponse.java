@@ -5,10 +5,10 @@ import java.time.LocalDateTime;
 public record UserListeningAttemptResponse(
         Integer attemptId,
         Integer userId,
-        Integer questionId,
-        String audioMaterialUrl,
+        Integer practiceActivityId, // Changed from questionId
+        // Removed String audioMaterialUrl,
         String userTranscribedText,
-        String actualTranscriptText,
+        // Removed String actualTranscriptText,
         Integer accuracyScore,
         LocalDateTime attemptDate
 ) {}

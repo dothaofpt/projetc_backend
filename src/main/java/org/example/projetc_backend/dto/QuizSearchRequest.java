@@ -1,12 +1,12 @@
 package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.Min;
-import org.example.projetc_backend.entity.Quiz; // Import enum từ entity
+import org.example.projetc_backend.entity.Quiz; // Đảm bảo import enum từ entity
 
 public record QuizSearchRequest(
         Integer lessonId,
         String title,
-        Quiz.Skill skill, // Sử dụng enum trực tiếp
+        Quiz.QuizType quizType, // ĐÃ SỬA: Sử dụng Quiz.QuizType thay vì Quiz.Skill
         @Min(0) Integer page,
         @Min(1) Integer size,
         String sortBy,

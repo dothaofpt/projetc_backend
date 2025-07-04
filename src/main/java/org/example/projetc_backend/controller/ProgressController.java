@@ -2,13 +2,15 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.ProgressRequest;
 import org.example.projetc_backend.dto.ProgressResponse;
+import org.example.projetc_backend.dto.ProgressSearchRequest;
+import org.example.projetc_backend.dto.ProgressPageResponse;
 import org.example.projetc_backend.service.ProgressService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize; // Import PreAuthorize
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid; // Import Valid
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -24,16 +26,38 @@ public class ProgressController {
     }
 
     /**
-     * Endpoint để cập nhật hoặc tạo mới một bản ghi tiến độ cho một người dùng, bài học và loại hoạt động cụ thể.
-     * Cả USER và ADMIN đều có quyền. USER chỉ có thể cập nhật tiến độ của chính mình.
-     * @param request Dữ liệu yêu cầu cập nhật tiến độ (bao gồm userId, lessonId, activityType, status, completionPercentage).
-     * @return ResponseEntity chứa ProgressResponse của bản ghi đã được xử lý.
+     * Endpoint để tạo mới một bản ghi tiến độ.
+     * Sử dụng POST request.
+     * Cả USER và ADMIN đều có quyền.
+     * @param request Dữ liệu yêu cầu tạo tiến độ (userId, lessonId, activityType, status, completionPercentage).
+     * @return ResponseEntity chứa ProgressResponse của bản ghi đã được tạo.
      */
-    @PostMapping
+    @PostMapping // <-- Endpoint MỚI cho tạo mới
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')") // Ví dụ: @PreAuthorize("hasRole('ADMIN') or (#request.userId() == authentication.principal.id)")
-    public ResponseEntity<ProgressResponse> updateProgress(@Valid @RequestBody ProgressRequest request) {
+    public ResponseEntity<ProgressResponse> createProgress(@Valid @RequestBody ProgressRequest request) {
         try {
-            ProgressResponse response = progressService.updateProgress(request);
+            ProgressResponse response = progressService.createProgress(request);
+            return new ResponseEntity<>(response, HttpStatus.CREATED); // Trả về 201 Created
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Endpoint để cập nhật một bản ghi tiến độ hiện có.
+     * Sử dụng PUT request và yêu cầu ID của tiến độ trên URL.
+     * Cả USER và ADMIN đều có quyền. USER chỉ có thể cập nhật tiến độ của chính mình.
+     * @param progressId ID của bản ghi tiến độ cần cập nhật.
+     * @param request Dữ liệu yêu cầu cập nhật tiến độ.
+     * @return ResponseEntity chứa ProgressResponse của bản ghi đã được cập nhật.
+     */
+    @PutMapping("/{progressId}") // <-- Endpoint MỚI cho cập nhật
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')") // Ví dụ: @PreAuthorize("hasRole('ADMIN') or (progressService.getProgressById(#progressId).userId() == authentication.principal.id)")
+    public ResponseEntity<ProgressResponse> updateProgress(@PathVariable Integer progressId, @Valid @RequestBody ProgressRequest request) {
+        try {
+            // Lưu ý: Logic ủy quyền phức tạp hơn cho update (ví dụ: USER chỉ cập nhật của chính họ)
+            // có thể cần được xử lý trong service hoặc sử dụng Spring Security biểu thức phức tạp hơn.
+            ProgressResponse response = progressService.updateProgress(progressId, request);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
@@ -116,6 +140,24 @@ public class ProgressController {
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
+    /**
+     * Endpoint để tìm kiếm và phân trang các bản ghi tiến độ.
+     * Endpoint Backend: POST /api/progress/search
+     * Chỉ ADMIN mới có quyền.
+     * @param request DTO chứa các tiêu chí tìm kiếm (userId, lessonId, activityType, status, minCompletionPercentage, maxCompletionPercentage) và thông tin phân trang/sắp xếp.
+     * @return ResponseEntity chứa ProgressPageResponse của trang kết quả.
+     */
+    @PostMapping("/search")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProgressPageResponse> searchProgress(@Valid @RequestBody ProgressSearchRequest request) {
+        try {
+            ProgressPageResponse response = progressService.searchProgress(request);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
         }
     }
 }

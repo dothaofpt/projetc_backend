@@ -66,6 +66,42 @@ public class QuizResultService {
     }
 
     /**
+     * Cập nhật một kết quả bài kiểm tra hiện có.
+     * Chỉ cho phép cập nhật điểm số và thời lượng. User và Quiz không được thay đổi.
+     *
+     * @param resultId ID của kết quả bài kiểm tra cần cập nhật.
+     * @param request DTO chứa thông tin cập nhật (score, durationSeconds).
+     * @return QuizResultResponse của kết quả đã cập nhật.
+     * @throws IllegalArgumentException nếu dữ liệu request không hợp lệ hoặc không tìm thấy QuizResult.
+     */
+    @Transactional
+    public QuizResultResponse updateQuizResult(Integer resultId, QuizResultRequest request) {
+        if (resultId == null) {
+            throw new IllegalArgumentException("Result ID không được để trống.");
+        }
+        if (request == null || request.score() == null) {
+            throw new IllegalArgumentException("Điểm số là bắt buộc khi cập nhật.");
+        }
+        if (request.score() < 0) {
+            throw new IllegalArgumentException("Điểm số không được nhỏ hơn 0.");
+        }
+
+        QuizResult quizResult = quizResultRepository.findById(resultId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy kết quả bài kiểm tra với ID: " + resultId));
+
+        // Cập nhật các trường được phép thay đổi
+        quizResult.setScore(request.score());
+        quizResult.setDurationSeconds(request.durationSeconds());
+        // Không cho phép thay đổi userId và quizId khi cập nhật kết quả đã tồn tại
+        // quizResult.setUser(userRepository.findById(request.userId()).orElseThrow(() -> new IllegalArgumentException("User not found.")));
+        // quizResult.setQuiz(quizRepository.findById(request.quizId()).orElseThrow(() -> new IllegalArgumentException("Quiz not found.")));
+
+        // Lưu thay đổi vào cơ sở dữ liệu
+        quizResult = quizResultRepository.save(quizResult);
+        return mapToQuizResultResponse(quizResult);
+    }
+
+    /**
      * Lấy kết quả bài kiểm tra của một người dùng cho một bài quiz cụ thể.
      *
      * @param userId ID của người dùng.
