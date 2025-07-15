@@ -1,5 +1,5 @@
 # Project-specific files
-.env
+
 !.env.example
 *.log
 *.bak

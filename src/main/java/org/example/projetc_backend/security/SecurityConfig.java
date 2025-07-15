@@ -38,18 +38,21 @@ public class SecurityConfig {
                         // Public endpoints (no authentication required)
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/quizzes/**", "/api/vocabulary/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/lessons/**").permitAll() // Cho phép GET cho tất cả
-                        .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("ADMIN") // Giới hạn POST cho ADMIN
-                        .requestMatchers(HttpMethod.PUT, "/api/lessons/**").hasRole("ADMIN") // Giới hạn PUT cho ADMIN
-                        .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("ADMIN") // Giới hạn DELETE cho ADMIN
+                        .requestMatchers(HttpMethod.GET, "/api/lessons/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/lessons/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("ADMIN")
                         .requestMatchers("/api/stats").hasRole("ADMIN")
                         .requestMatchers("/api/questions/**", "/api/answers/**", "/api/learning-materials/**").hasRole("ADMIN")
 
+                        // Thêm các endpoint PayPal vào danh sách được phép truy cập công khai
+                        .requestMatchers("/api/payments/paypal/complete", "/api/payments/paypal/cancel").permitAll()
+
                         // Add flashcard-sets endpoints
-                        .requestMatchers(HttpMethod.GET, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER") // Allow GET for authenticated users
-                        .requestMatchers(HttpMethod.POST, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER") // Allow POST for authenticated users
-                        .requestMatchers(HttpMethod.PUT, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER") // Allow PUT for authenticated users
-                        .requestMatchers(HttpMethod.DELETE, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER") // Allow DELETE for authenticated users
+                        .requestMatchers(HttpMethod.GET, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
 
                         // Protected endpoints
                         .requestMatchers("/api/progress/**", "/api/quiz-results/**", "/api/user-flashcards/**")
@@ -77,10 +80,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:4200", // Angular default port
+                "http://localhost:4200",
                 "http://localhost:8000",
-                "http://localhost:8080", // Backend port
-                "http://localhost:61299"
+                "http://localhost:8080",
+                "http://localhost:61299",
+                "http://192.168.2.12:8080",
+                "http://10.24.27.184:8080" // Thêm địa chỉ IP mới vào đây
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
