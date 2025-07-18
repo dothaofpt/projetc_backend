@@ -2,9 +2,10 @@ package org.example.projetc_backend.controller;
 
 import org.example.projetc_backend.dto.VocabularyRequest;
 import org.example.projetc_backend.dto.VocabularyResponse;
-import org.example.projetc_backend.dto.VocabularySearchRequest; // Import VocabularySearchRequest DTO mới
+import org.example.projetc_backend.dto.VocabularySearchRequest;
+import org.example.projetc_backend.dto.VocabularyPageResponse;
 import org.example.projetc_backend.service.VocabularyService;
-import org.springframework.data.domain.Page; // Import Page
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,12 +26,6 @@ public class VocabularyController {
         this.vocabularyService = vocabularyService;
     }
 
-    /**
-     * Tạo một từ vựng mới.
-     * Chỉ ADMIN mới có quyền.
-     * @param request DTO chứa thông tin từ vựng.
-     * @return ResponseEntity với VocabularyResponse của từ vựng đã tạo.
-     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<VocabularyResponse> createVocabulary(@Valid @RequestBody VocabularyRequest request) {
@@ -38,17 +33,12 @@ public class VocabularyController {
             VocabularyResponse response = vocabularyService.createVocabulary(request);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            // Bao gồm thông báo lỗi trong response body
-            return new ResponseEntity<>(new VocabularyResponse(null, null, null, null, null, null, null, null, null), HttpStatus.BAD_REQUEST);
+            return ResponseEntity.badRequest().body(new VocabularyResponse(null, null, e.getMessage(), null, null, null, null, null, null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new VocabularyResponse(null, null, "Đã xảy ra lỗi hệ thống.", null, null, null, null, null, null));
         }
     }
 
-    /**
-     * Lấy thông tin một từ vựng theo ID.
-     * Có thể truy cập công khai.
-     * @param wordId ID của từ vựng.
-     * @return ResponseEntity với VocabularyResponse.
-     */
     @GetMapping("/{wordId}")
     public ResponseEntity<VocabularyResponse> getVocabularyById(@PathVariable Integer wordId) {
         try {
@@ -56,49 +46,30 @@ public class VocabularyController {
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
-    /**
-     * Lấy tất cả các từ vựng hoặc tìm kiếm/phân trang từ vựng.
-     * Có thể truy cập công khai.
-     *
-     * @param searchRequest DTO chứa các tiêu chí tìm kiếm và thông tin phân trang/sắp xếp (optional).
-     * @return ResponseEntity với Page<VocabularyResponse> hoặc List<VocabularyResponse> nếu không có tiêu chí tìm kiếm.
-     */
-    @GetMapping // Endpoint này sẽ xử lý cả getAll và search
-    public ResponseEntity<?> getOrSearchVocabulary(@Valid VocabularySearchRequest searchRequest) {
-        // Kiểm tra nếu tất cả các trường tìm kiếm là null và page/size là mặc định,
-        // thì có thể xem xét trả về tất cả (getAllVocabulary)
-        // Tuy nhiên, việc sử dụng search luôn là cách tiếp cận nhất quán và linh hoạt hơn
-        // vì nó đã bao gồm logic phân trang/sắp xếp.
-
-        // Nếu người dùng không cung cấp các tham số phân trang, chúng ta có thể đặt mặc định trong DTO.
-        // VocabularySearchRequest đã có logic đặt giá trị mặc định cho page, size, sortBy, sortDir.
-        Page<VocabularyResponse> responsePage = vocabularyService.searchVocabularies(searchRequest);
-        return new ResponseEntity<>(responsePage, HttpStatus.OK);
-
-        /*
-        // Cách cũ nếu bạn muốn giữ riêng getAllVocabulary:
-        if (searchRequest.word() == null && searchRequest.meaning() == null && searchRequest.difficultyLevel() == null &&
-            searchRequest.page() == 0 && searchRequest.size() == 10 && searchRequest.sortBy().equals("wordId") && searchRequest.sortDir().equals("ASC")) {
-            List<VocabularyResponse> allResponses = vocabularyService.getAllVocabulary();
-            return new ResponseEntity<>(allResponses, HttpStatus.OK); // Trả về List nếu không có tham số tìm kiếm/phân trang
-        } else {
+    @PostMapping("/search")
+    public ResponseEntity<VocabularyPageResponse> searchVocabulary(@RequestBody VocabularySearchRequest searchRequest) {
+        try {
             Page<VocabularyResponse> responsePage = vocabularyService.searchVocabularies(searchRequest);
-            return new ResponseEntity<>(responsePage, HttpStatus.OK); // Trả về Page nếu có
+            VocabularyPageResponse customResponsePage = new VocabularyPageResponse(
+                    responsePage.getContent(),
+                    responsePage.getTotalElements(),
+                    responsePage.getTotalPages(),
+                    responsePage.getNumber(),
+                    responsePage.getSize()
+            );
+            return new ResponseEntity<>(customResponsePage, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new VocabularyPageResponse(List.of(), 0, 0, 0, searchRequest.size()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new VocabularyPageResponse(List.of(), 0, 0, 0, searchRequest.size()));
         }
-        */
     }
 
-
-    /**
-     * Cập nhật thông tin một từ vựng.
-     * Chỉ ADMIN mới có quyền.
-     * @param wordId ID của từ vựng.
-     * @param request DTO chứa thông tin cập nhật.
-     * @return ResponseEntity với VocabularyResponse đã cập nhật.
-     */
     @PutMapping("/{wordId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<VocabularyResponse> updateVocabulary(@PathVariable Integer wordId,
@@ -107,16 +78,12 @@ public class VocabularyController {
             VocabularyResponse response = vocabularyService.updateVocabulary(wordId, request);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(new VocabularyResponse(null, null, null, null, null, null, null, null, null), HttpStatus.BAD_REQUEST);
+            return ResponseEntity.badRequest().body(new VocabularyResponse(null, null, e.getMessage(), null, null, null, null, null, null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new VocabularyResponse(null, null, "Đã xảy ra lỗi hệ thống.", null, null, null, null, null, null));
         }
     }
 
-    /**
-     * Xóa một từ vựng.
-     * Chỉ ADMIN mới có quyền.
-     * @param wordId ID của từ vựng.
-     * @return ResponseEntity với HttpStatus.NO_CONTENT.
-     */
     @DeleteMapping("/{wordId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteVocabulary(@PathVariable Integer wordId) {
@@ -125,6 +92,8 @@ public class VocabularyController {
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 }

@@ -1,7 +1,8 @@
+// VocabularySearchRequest
 package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.Min;
-import org.example.projetc_backend.entity.Vocabulary; // Import enum từ entity
+import org.example.projetc_backend.entity.Vocabulary;
 
 public record VocabularySearchRequest(
         String word,

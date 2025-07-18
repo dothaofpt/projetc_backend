@@ -1,16 +1,19 @@
 package org.example.projetc_backend.service;
 
+import org.example.projetc_backend.dto.FlashcardResponse;
 import org.example.projetc_backend.dto.FlashcardSetRequest;
 import org.example.projetc_backend.dto.FlashcardSetResponse;
 import org.example.projetc_backend.dto.FlashcardSetSearchRequest;
-import org.example.projetc_backend.dto.VocabularyResponse;
+import org.example.projetc_backend.dto.VocabularyResponse; // Vẫn giữ nếu mapVocabularyToResponse được gọi ở đâu đó
 import org.example.projetc_backend.entity.FlashcardSet;
 import org.example.projetc_backend.entity.FlashcardSetVocabulary;
 import org.example.projetc_backend.entity.FlashcardSetVocabularyId;
 import org.example.projetc_backend.entity.User;
+import org.example.projetc_backend.entity.UserFlashcard;
 import org.example.projetc_backend.entity.Vocabulary;
 import org.example.projetc_backend.repository.FlashcardSetRepository;
 import org.example.projetc_backend.repository.FlashcardSetVocabularyRepository;
+import org.example.projetc_backend.repository.UserFlashcardRepository;
 import org.example.projetc_backend.repository.UserRepository;
 import org.example.projetc_backend.repository.VocabularyRepository;
 import org.springframework.data.domain.Page;
@@ -20,7 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -31,24 +36,23 @@ public class FlashcardSetService {
     private final UserRepository userRepository;
     private final VocabularyRepository vocabularyRepository;
     private final FlashcardSetVocabularyRepository flashcardSetVocabularyRepository;
+    private final UserFlashcardRepository userFlashcardRepository;
+    private final FlashcardService flashcardService;
 
     public FlashcardSetService(FlashcardSetRepository flashcardSetRepository,
                                UserRepository userRepository,
                                VocabularyRepository vocabularyRepository,
-                               FlashcardSetVocabularyRepository flashcardSetVocabularyRepository) {
+                               FlashcardSetVocabularyRepository flashcardSetVocabularyRepository,
+                               UserFlashcardRepository userFlashcardRepository,
+                               FlashcardService flashcardService) {
         this.flashcardSetRepository = flashcardSetRepository;
         this.userRepository = userRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.flashcardSetVocabularyRepository = flashcardSetVocabularyRepository;
+        this.userFlashcardRepository = userFlashcardRepository;
+        this.flashcardService = flashcardService;
     }
 
-    /**
-     * Tạo một bộ flashcard mới.
-     *
-     * @param request Dữ liệu yêu cầu tạo bộ flashcard.
-     * @return FlashcardSetResponse của bộ flashcard đã tạo.
-     * @throws IllegalArgumentException Nếu tiêu đề trống, creatorUserId không hợp lệ, hoặc bộ flashcard đã tồn tại.
-     */
     @Transactional
     public FlashcardSetResponse createFlashcardSet(FlashcardSetRequest request) {
         if (request == null || request.title() == null || request.title().trim().isEmpty()) {
@@ -64,7 +68,6 @@ public class FlashcardSetService {
                     .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người tạo với ID: " + request.creatorUserId()));
         }
 
-        // SỬA: Sử dụng findByTitle vì không có findByTitleAndIsDeletedFalse trong Repository
         Optional<FlashcardSet> existingSet = flashcardSetRepository.findByTitle(request.title());
         if (existingSet.isPresent()) {
             throw new IllegalArgumentException("Bộ flashcard với tiêu đề '" + request.title() + "' đã tồn tại.");
@@ -76,51 +79,32 @@ public class FlashcardSetService {
         flashcardSet.setCreator(creator);
         flashcardSet.setSystemCreated(Boolean.TRUE.equals(request.isSystemCreated()));
         flashcardSet.setCreatedAt(LocalDateTime.now());
-        // BỎ QUA: flashcardSet.setDeleted(false); vì không có trường isDeleted trong entity
         flashcardSet = flashcardSetRepository.save(flashcardSet);
 
-        // Thêm từ vựng vào bộ nếu có danh sách wordIds được cung cấp
         if (request.wordIds() != null && !request.wordIds().isEmpty()) {
             for (Integer wordId : request.wordIds()) {
-                // Kiểm tra xem flashcardSet.getSetId() có trả về giá trị null không
                 if (flashcardSet.getSetId() != null) {
                     addVocabularyToSet(flashcardSet.getSetId(), wordId);
                 } else {
-                    // Xử lý trường hợp setId là null nếu save không gán ID ngay lập tức
-                    // Trong trường hợp dùng IDENTITY, ID sẽ có sau khi save.
                     throw new IllegalStateException("Set ID không được tạo sau khi lưu FlashcardSet.");
                 }
             }
         }
 
-        return mapToFlashcardSetResponse(flashcardSet);
+        return mapToFlashcardSetResponse(flashcardSet, null);
     }
 
-    /**
-     * Lấy thông tin chi tiết của một bộ flashcard theo ID.
-     *
-     * @param setId ID của bộ flashcard.
-     * @return FlashcardSetResponse của bộ flashcard.
-     * @throws IllegalArgumentException Nếu Set ID trống hoặc không tìm thấy bộ flashcard.
-     */
     @Transactional(readOnly = true)
-    public FlashcardSetResponse getFlashcardSetById(Integer setId) {
+    public FlashcardSetResponse getFlashcardSetById(Integer setId, Integer currentUserId) {
         if (setId == null) {
             throw new IllegalArgumentException("Set ID không được để trống.");
         }
-        // SỬA: Sử dụng findById vì không có findBySetIdAndIsDeletedFalse trong Repository
         FlashcardSet flashcardSet = flashcardSetRepository.findById(setId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bộ flashcard với ID: " + setId));
-        return mapToFlashcardSetResponse(flashcardSet);
+
+        return mapToFlashcardSetResponse(flashcardSet, currentUserId);
     }
 
-    /**
-     * Tìm kiếm và phân trang các bộ flashcard.
-     *
-     * @param request Các tiêu chí tìm kiếm và phân trang.
-     * @return Page chứa danh sách các FlashcardSetResponse.
-     * @throws IllegalArgumentException Nếu Search request trống.
-     */
     @Transactional(readOnly = true)
     public Page<FlashcardSetResponse> searchFlashcardSets(FlashcardSetSearchRequest request) {
         if (request == null) {
@@ -129,15 +113,12 @@ public class FlashcardSetService {
 
         String sortBy = request.sortBy();
         if (!List.of("setId", "title", "createdAt", "creator.userId", "isSystemCreated").contains(sortBy)) {
-            sortBy = "setId"; // Mặc định sắp xếp theo ID
+            sortBy = "setId";
         }
 
         Sort sort = Sort.by(request.sortDir().equalsIgnoreCase("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
         PageRequest pageable = PageRequest.of(request.page(), request.size(), sort);
 
-        // Giả định FlashcardSetRepository có phương thức search mạnh mẽ:
-        // Page<FlashcardSet> searchFlashcardSets(String title, Boolean isSystemCreated, Integer creatorUserId, Pageable pageable);
-        // Phương thức này không bao gồm điều kiện `isDeleted = false` vì Entity không có trường đó.
         Page<FlashcardSet> sets = flashcardSetRepository.searchFlashcardSets(
                 request.title(),
                 request.isSystemCreated(),
@@ -145,31 +126,20 @@ public class FlashcardSetService {
                 pageable
         );
 
-        return sets.map(this::mapToFlashcardSetResponse);
+        return sets.map(flashcardSet -> mapToFlashcardSetResponse(flashcardSet, null));
     }
 
-    /**
-     * Cập nhật thông tin của một bộ flashcard.
-     *
-     * @param setId ID của bộ flashcard cần cập nhật.
-     * @param request Dữ liệu yêu cầu cập nhật.
-     * @return FlashcardSetResponse của bộ flashcard đã cập nhật.
-     * @throws IllegalArgumentException Nếu Set ID, tiêu đề trống, không tìm thấy bộ flashcard, hoặc tiêu đề trùng lặp.
-     */
     @Transactional
     public FlashcardSetResponse updateFlashcardSet(Integer setId, FlashcardSetRequest request) {
         if (setId == null || request == null || request.title() == null || request.title().trim().isEmpty()) {
             throw new IllegalArgumentException("Set ID và tiêu đề của bộ flashcard là bắt buộc.");
         }
 
-        // SỬA: Sử dụng findById vì không có findBySetIdAndIsDeletedFalse trong Repository
         FlashcardSet flashcardSet = flashcardSetRepository.findById(setId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bộ flashcard với ID: " + setId));
 
-        // Kiểm tra tiêu đề trùng lặp với các bộ khác
-        // SỬA: Sử dụng findByTitle vì không có findByTitleAndIsDeletedFalse
         flashcardSetRepository.findByTitle(request.title())
-                .filter(fs -> !fs.getSetId().equals(setId)) // Đảm bảo không phải chính nó
+                .filter(fs -> !fs.getSetId().equals(setId))
                 .ifPresent(fs -> {
                     throw new IllegalArgumentException("Bộ flashcard với tiêu đề '" + request.title() + "' đã tồn tại.");
                 });
@@ -180,7 +150,6 @@ public class FlashcardSetService {
             flashcardSet.setSystemCreated(request.isSystemCreated());
         }
 
-        // Cập nhật người tạo nếu có sự thay đổi
         if (request.creatorUserId() != null) {
             if (flashcardSet.getCreator() == null || !flashcardSet.getCreator().getUserId().equals(request.creatorUserId())) {
                 User newCreator = userRepository.findById(request.creatorUserId())
@@ -188,7 +157,6 @@ public class FlashcardSetService {
                 flashcardSet.setCreator(newCreator);
             }
         } else {
-            // Nếu creatorUserId là null trong request, và bộ không phải do hệ thống tạo, đặt creator về null.
             if (!flashcardSet.isSystemCreated()) {
                 flashcardSet.setCreator(null);
             }
@@ -196,7 +164,6 @@ public class FlashcardSetService {
 
         flashcardSet = flashcardSetRepository.save(flashcardSet);
 
-        // Cập nhật danh sách từ vựng trong bộ
         if (request.wordIds() != null) {
             List<Integer> currentWordIds = flashcardSetVocabularyRepository.findByFlashcardSetSetId(setId).stream()
                     .map(fsv -> fsv.getVocabulary().getWordId())
@@ -210,51 +177,32 @@ public class FlashcardSetService {
                     .filter(wordId -> !request.wordIds().contains(wordId))
                     .collect(Collectors.toList());
 
-            // Thêm các từ vựng mới
             wordsToAdd.forEach(wordId -> addVocabularyToSet(setId, wordId));
-            // Xóa các từ vựng không còn trong danh sách
             wordsToRemove.forEach(wordId -> removeVocabularyFromSet(setId, wordId));
         }
 
-        return mapToFlashcardSetResponse(flashcardSet);
+        return mapToFlashcardSetResponse(flashcardSet, null);
     }
 
-    /**
-     * Xóa một bộ flashcard (hard delete).
-     *
-     * @param setId ID của bộ flashcard cần xóa.
-     * @throws IllegalArgumentException Nếu Set ID trống hoặc không tìm thấy bộ flashcard.
-     */
     @Transactional
     public void deleteFlashcardSet(Integer setId) {
         if (setId == null) {
             throw new IllegalArgumentException("Set ID không được để trống.");
         }
-        // SỬA: Sử dụng findById vì không có findBySetIdAndIsDeletedFalse trong Repository
         FlashcardSet flashcardSet = flashcardSetRepository.findById(setId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bộ flashcard với ID: " + setId));
 
-        // BỎ QUA: flashcardSet.setDeleted(true); vì không có trường isDeleted trong entity
-        flashcardSetRepository.delete(flashcardSet); // Thực hiện hard delete
+        flashcardSetRepository.delete(flashcardSet);
     }
 
-    /**
-     * Thêm một từ vựng vào một bộ flashcard.
-     *
-     * @param setId ID của bộ flashcard.
-     * @param wordId ID của từ vựng.
-     * @throws IllegalArgumentException Nếu Set ID hoặc Word ID trống, không tìm thấy bộ flashcard/từ vựng, hoặc từ vựng đã tồn tại trong bộ.
-     */
     @Transactional
     public void addVocabularyToSet(Integer setId, Integer wordId) {
         if (setId == null || wordId == null) {
             throw new IllegalArgumentException("Set ID và Word ID không được để trống.");
         }
 
-        // SỬA: Sử dụng findById vì không có findBySetIdAndIsDeletedFalse trong Repository
         FlashcardSet flashcardSet = flashcardSetRepository.findById(setId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bộ flashcard với ID: " + setId));
-        // SỬA: Sử dụng findById vì không có findByWordIdAndIsDeletedFalse trong Repository
         Vocabulary vocabulary = vocabularyRepository.findById(wordId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + wordId));
 
@@ -266,13 +214,6 @@ public class FlashcardSetService {
         flashcardSetVocabularyRepository.save(fsv);
     }
 
-    /**
-     * Xóa một từ vựng khỏi một bộ flashcard.
-     *
-     * @param setId ID của bộ flashcard.
-     * @param wordId ID của từ vựng.
-     * @throws IllegalArgumentException Nếu Set ID hoặc Word ID trống, hoặc không tìm thấy liên kết.
-     */
     @Transactional
     public void removeVocabularyFromSet(Integer setId, Integer wordId) {
         if (setId == null || wordId == null) {
@@ -284,24 +225,52 @@ public class FlashcardSetService {
         flashcardSetVocabularyRepository.delete(fsv);
     }
 
-    // --- Private mapping methods ---
-
-    /**
-     * Ánh xạ một Entity FlashcardSet sang FlashcardSetResponse DTO, bao gồm danh sách từ vựng.
-     *
-     * @param flashcardSet Entity FlashcardSet.
-     * @return FlashcardSetResponse DTO.
-     */
-    private FlashcardSetResponse mapToFlashcardSetResponse(FlashcardSet flashcardSet) {
+    private FlashcardSetResponse mapToFlashcardSetResponse(FlashcardSet flashcardSet, Integer currentUserId) {
         if (flashcardSet == null) {
             return null;
         }
 
-        List<VocabularyResponse> vocabulariesInSet = flashcardSetVocabularyRepository.findByFlashcardSetSetId(flashcardSet.getSetId()).stream()
-                .map(FlashcardSetVocabulary::getVocabulary)
-                .filter(v -> v != null) // BỎ QUA: !v.isDeleted() vì Vocabulary không có isDeleted
-                .map(this::mapVocabularyToResponse)
-                .collect(Collectors.toList());
+        List<FlashcardResponse> flashcardsInSet = new ArrayList<>();
+        List<FlashcardSetVocabulary> setVocabularies = flashcardSetVocabularyRepository.findByFlashcardSetSetId(flashcardSet.getSetId());
+
+        Map<Integer, UserFlashcard> userFlashcardMap = currentUserId != null
+                ? userFlashcardRepository.findByUserUserIdAndVocabularyFlashcardSetVocabulariesFlashcardSetSetId(
+                        currentUserId, flashcardSet.getSetId()).stream()
+                .collect(Collectors.toMap(
+                        (UserFlashcard uf) -> uf.getVocabulary().getWordId(),
+                        (UserFlashcard uf) -> uf
+                ))
+                : Map.of();
+
+        for (FlashcardSetVocabulary fsv : setVocabularies) {
+            Vocabulary vocab = fsv.getVocabulary();
+            if (vocab != null) {
+                UserFlashcard userFlashcard = userFlashcardMap.get(vocab.getWordId());
+
+                if (userFlashcard != null) {
+                    flashcardsInSet.add(flashcardService.mapToFlashcardResponse(userFlashcard));
+                } else {
+                    flashcardsInSet.add(new FlashcardResponse(
+                            null,
+                            currentUserId,
+                            vocab.getWordId(),
+                            vocab.getWord(),
+                            vocab.getMeaning(),
+                            vocab.getExampleSentence(),
+                            vocab.getPronunciation(),
+                            vocab.getAudioUrl(),
+                            vocab.getImageUrl(),
+                            vocab.getWritingPrompt(),
+                            vocab.getDifficultyLevel(),
+                            false,
+                            null,
+                            null,
+                            0,
+                            2.5
+                    ));
+                }
+            }
+        }
 
         return new FlashcardSetResponse(
                 flashcardSet.getSetId(),
@@ -310,16 +279,12 @@ public class FlashcardSetService {
                 flashcardSet.getCreator() != null ? flashcardSet.getCreator().getUserId() : null,
                 flashcardSet.isSystemCreated(),
                 flashcardSet.getCreatedAt(),
-                vocabulariesInSet
+                flashcardsInSet
         );
     }
 
-    /**
-     * Ánh xạ một Entity Vocabulary sang VocabularyResponse DTO.
-     *
-     * @param vocabulary Entity Vocabulary.
-     * @return VocabularyResponse DTO.
-     */
+    // Phương thức này không còn được sử dụng trực tiếp để ánh xạ trong mapToFlashcardSetResponse
+    // nhưng có thể vẫn được dùng ở nơi khác, nên giữ nguyên.
     private VocabularyResponse mapVocabularyToResponse(Vocabulary vocabulary) {
         if (vocabulary == null) {
             return null;

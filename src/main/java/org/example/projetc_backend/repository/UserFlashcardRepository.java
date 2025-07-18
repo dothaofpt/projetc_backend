@@ -14,14 +14,31 @@ import java.util.Optional;
 
 @Repository
 public interface UserFlashcardRepository extends JpaRepository<UserFlashcard, Integer> {
+
     Optional<UserFlashcard> findByUserUserIdAndVocabularyWordId(Integer userId, Integer wordId);
     List<UserFlashcard> findByUserUserId(Integer userId);
     List<UserFlashcard> findByVocabularyWordId(Integer wordId);
 
+    // PHƯƠNG THỨC NÀY CẦN PHẢI TỒN TẠI VÀ CHÍNH XÁC
+    // Đảm bảo rằng trong entity Vocabulary của bạn có mối quan hệ ánh xạ tới FlashcardSetVocabulary
+    // Ví dụ trong Vocabulary.java có thể có:
+    // @OneToMany(mappedBy = "vocabulary")
+    // private Set<FlashcardSetVocabulary> flashcardSetVocabularies; // Tên thuộc tính này phải khớp
     @Query("SELECT uf FROM UserFlashcard uf " +
             "JOIN uf.vocabulary v " +
-            "LEFT JOIN FlashcardSetVocabulary fsv ON v.wordId = fsv.vocabulary.wordId " +
-            "WHERE uf.user.userId = :userId AND " +
+            "JOIN v.flashcardSetVocabularies fsv " + // 'flashcardSetVocabularies' là tên thuộc tính trong Vocabulary entity
+            "WHERE uf.user.userId = :userId " +
+            "AND fsv.flashcardSet.setId = :setId")
+    List<UserFlashcard> findByUserUserIdAndVocabularyFlashcardSetVocabulariesFlashcardSetSetId(
+            @Param("userId") Integer userId,
+            @Param("setId") Integer setId
+    );
+
+    @Query("SELECT uf FROM UserFlashcard uf " +
+            "JOIN uf.vocabulary v " +
+            // LEFT JOIN để đảm bảo cả các UserFlashcard không thuộc set nào cũng được xem xét nếu setId IS NULL
+            "LEFT JOIN v.flashcardSetVocabularies fsv ON v.wordId = fsv.vocabulary.wordId " +
+            "WHERE (:userId IS NULL OR uf.user.userId = :userId) AND " +
             "(:setId IS NULL OR fsv.flashcardSet.setId = :setId) AND " +
             "(:wordId IS NULL OR v.wordId = :wordId) AND " +
             "(:word IS NULL OR LOWER(v.word) LIKE LOWER(CONCAT('%', :word, '%'))) AND " +
@@ -44,5 +61,6 @@ public interface UserFlashcardRepository extends JpaRepository<UserFlashcard, In
             @Param("maxReviewIntervalDays") Integer maxReviewIntervalDays,
             @Param("minEaseFactor") Double minEaseFactor,
             @Param("maxEaseFactor") Double maxEaseFactor,
-            Pageable pageable);
+            Pageable pageable
+    );
 }

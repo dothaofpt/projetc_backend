@@ -14,7 +14,7 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer orderId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -35,13 +35,13 @@ public class Order {
     private Payment payment;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderDetail> orderDetails; // Đã thêm kiểu dữ liệu cụ thể
+    private List<OrderDetail> orderDetails;
 
     public enum OrderStatus {
         PENDING,
+        PROCESSING,
         COMPLETED,
-        CANCELLED,
-        PROCESSING
+        CANCELLED
     }
 
     @PrePersist

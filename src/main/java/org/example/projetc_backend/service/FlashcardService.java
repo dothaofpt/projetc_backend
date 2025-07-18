@@ -35,14 +35,6 @@ public class FlashcardService {
         this.vocabularyRepository = vocabularyRepository;
     }
 
-    /**
-     * Tạo hoặc cập nhật một UserFlashcard.
-     * Phương thức này sẽ quản lý các thuộc tính liên quan đến quá trình học tập (spaced repetition).
-     *
-     * @param request DTO UserFlashcardRequest chứa thông tin cần thiết.
-     * @return FlashcardResponse của UserFlashcard đã được tạo/cập nhật.
-     * @throws IllegalArgumentException Nếu User ID hoặc Word ID trống, hoặc không tìm thấy người dùng/từ vựng.
-     */
     @Transactional
     public FlashcardResponse createUserFlashcard(UserFlashcardRequest request) {
         if (request == null || request.userId() == null || request.wordId() == null) {
@@ -51,39 +43,29 @@ public class FlashcardService {
 
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
-        // SỬA: Sử dụng findById vì Vocabulary không có isDeleted trong entity cung cấp
         Vocabulary vocabulary = vocabularyRepository.findById(request.wordId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + request.wordId()));
 
         UserFlashcard userFlashcard = userFlashcardRepository
                 .findByUserUserIdAndVocabularyWordId(request.userId(), request.wordId())
                 .orElseGet(() -> {
-                    // Nếu chưa tồn tại, tạo mới UserFlashcard với các giá trị mặc định cho spaced repetition
                     UserFlashcard newFlashcard = new UserFlashcard();
                     newFlashcard.setUser(user);
                     newFlashcard.setVocabulary(vocabulary);
-                    newFlashcard.setKnown(false); // Mặc định là chưa biết
-                    newFlashcard.setEaseFactor(2.5); // Giá trị mặc định cho SM-2 algorithm
-                    newFlashcard.setReviewIntervalDays(0); // Bắt đầu từ 0 ngày
-                    newFlashcard.setLastReviewedAt(LocalDateTime.now()); // Lần đầu tạo coi như đã xem xét
-                    newFlashcard.setNextReviewAt(LocalDateTime.now()); // Có thể xem xét ngay
+                    newFlashcard.setKnown(false);
+                    newFlashcard.setEaseFactor(2.5);
+                    newFlashcard.setReviewIntervalDays(0);
+                    newFlashcard.setLastReviewedAt(LocalDateTime.now());
+                    newFlashcard.setNextReviewAt(LocalDateTime.now());
                     return newFlashcard;
                 });
 
-        // Cập nhật trạng thái isKnown từ request
         userFlashcard.setKnown(request.isKnown());
 
         userFlashcard = userFlashcardRepository.save(userFlashcard);
         return mapToFlashcardResponse(userFlashcard);
     }
 
-    /**
-     * Lấy một UserFlashcard cụ thể của người dùng.
-     *
-     * @param userFlashcardId ID của UserFlashcard.
-     * @return FlashcardResponse.
-     * @throws IllegalArgumentException Nếu không tìm thấy flashcard người dùng.
-     */
     @Transactional(readOnly = true)
     public FlashcardResponse getUserFlashcardById(Integer userFlashcardId) {
         if (userFlashcardId == null) {
@@ -94,14 +76,6 @@ public class FlashcardService {
         return mapToFlashcardResponse(userFlashcard);
     }
 
-    /**
-     * Tìm kiếm và phân trang các flashcard của người dùng.
-     * Cho phép lọc theo User ID, Word ID, Set ID, từ khóa, nghĩa, trạng thái biết/chưa biết và mức độ khó.
-     *
-     * @param request Các tiêu chí tìm kiếm và phân trang.
-     * @return FlashcardPageResponse chứa danh sách các FlashcardResponse.
-     * @throws IllegalArgumentException Nếu User ID trong request trống hoặc không tìm thấy người dùng.
-     */
     @Transactional(readOnly = true)
     public FlashcardPageResponse searchUserFlashcards(FlashcardSearchRequest request) {
         if (request == null || request.userId() == null) {
@@ -112,29 +86,25 @@ public class FlashcardService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
 
         String sortBy = request.sortBy();
-        // Cần đảm bảo khớp với entity hoặc alias được sử dụng trong truy vấn Repository
         if (!List.of("id", "vocabulary.word", "vocabulary.meaning", "vocabulary.difficultyLevel", "isKnown", "lastReviewedAt", "nextReviewAt").contains(sortBy)) {
-            sortBy = "id"; // Mặc định sắp xếp theo ID của UserFlashcard
+            sortBy = "id";
         }
 
         Sort sort = Sort.by(request.sortDir().equalsIgnoreCase("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
         PageRequest pageable = PageRequest.of(request.page(), request.size(), sort);
 
-        // SỬA: Cập nhật lời gọi phương thức searchUserFlashcards để khớp với chữ ký của UserFlashcardRepository
-        // Các tham số `minReviewIntervalDays`, `maxReviewIntervalDays`, `minEaseFactor`, `maxEaseFactor`
-        // không có trong FlashcardSearchRequest DTO của bạn. Để tránh lỗi, tôi sẽ truyền null cho các tham số này.
         Page<UserFlashcard> flashcardPage = userFlashcardRepository.searchUserFlashcards(
                 request.userId(),
                 request.setId(),
-                request.wordId(), // Thêm wordId
+                request.wordId(), // Đây là dòng đã sửa để khớp với chữ ký mới trong Repository
                 request.word(),
                 request.meaning(),
                 request.isKnown(),
                 request.difficultyLevel(),
-                null, // minReviewIntervalDays (không có trong DTO)
-                null, // maxReviewIntervalDays (không có trong DTO)
-                null, // minEaseFactor (không có trong DTO)
-                null, // maxEaseFactor (không có trong DTO)
+                null, // minReviewIntervalDays
+                null, // maxReviewIntervalDays
+                null, // minEaseFactor
+                null, // maxEaseFactor
                 pageable
         );
 
@@ -151,12 +121,6 @@ public class FlashcardService {
         );
     }
 
-    /**
-     * Xóa một UserFlashcard.
-     *
-     * @param userFlashcardId ID của UserFlashcard cần xóa.
-     * @throws IllegalArgumentException Nếu User Flashcard ID trống hoặc không tìm thấy flashcard.
-     */
     @Transactional
     public void deleteUserFlashcard(Integer userFlashcardId) {
         if (userFlashcardId == null) {
@@ -167,21 +131,13 @@ public class FlashcardService {
         userFlashcardRepository.delete(flashcard);
     }
 
-    // --- Private mapping methods ---
-
-    /**
-     * Ánh xạ một Entity UserFlashcard sang FlashcardResponse DTO.
-     *
-     * @param userFlashcard Entity UserFlashcard.
-     * @return FlashcardResponse DTO.
-     */
-    private FlashcardResponse mapToFlashcardResponse(UserFlashcard userFlashcard) {
+    public FlashcardResponse mapToFlashcardResponse(UserFlashcard userFlashcard) {
         if (userFlashcard == null || userFlashcard.getVocabulary() == null || userFlashcard.getUser() == null) {
-            return null; // Hoặc throw exception nếu dữ liệu không hợp lệ
+            return null;
         }
         Vocabulary vocab = userFlashcard.getVocabulary();
         return new FlashcardResponse(
-                userFlashcard.getId(), // Sử dụng ID của UserFlashcard
+                userFlashcard.getId(),
                 userFlashcard.getUser().getUserId(),
                 vocab.getWordId(),
                 vocab.getWord(),

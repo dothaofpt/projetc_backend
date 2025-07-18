@@ -7,7 +7,7 @@ public record QuizResponse(
         Integer quizId,
         Integer lessonId,
         String title,
-        // Removed Quiz.Skill skill
         Quiz.QuizType quizType, // Added the new QuizType enum
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String lessonTitle // <--- THÊM DÒNG NÀY ĐỂ TRẢ VỀ TÊN BÀI HỌC
 ) {}

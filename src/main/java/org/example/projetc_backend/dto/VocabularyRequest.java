@@ -1,8 +1,9 @@
+// VocabularyRequest
 package org.example.projetc_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import org.example.projetc_backend.entity.Vocabulary; // Import enum từ entity
+import org.example.projetc_backend.entity.Vocabulary;
 
 public record VocabularyRequest(
         @NotBlank(message = "Word is required")
@@ -12,8 +13,8 @@ public record VocabularyRequest(
         String exampleSentence,
         String pronunciation,
         String audioUrl,
-        String imageUrl, // Bổ sung
+        String imageUrl,
         String writingPrompt,
         @NotNull(message = "Difficulty level is required")
-        Vocabulary.DifficultyLevel difficultyLevel // Sử dụng enum trực tiếp
+        Vocabulary.DifficultyLevel difficultyLevel
 ) {}

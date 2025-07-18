@@ -13,11 +13,11 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer paymentId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false, unique = true)
     private Order order;
 
@@ -40,8 +40,16 @@ public class Payment {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    // THÊM MỚI: Hai trường này để lưu deep-link của frontend
+    @Column(name = "success_url", length = 512)
+    private String successUrl;
+
+    @Column(name = "cancel_url", length = 512)
+    private String cancelUrl;
+
     public enum PaymentStatus {
         PENDING,
+        PROCESSING, // THÊM MỚI
         COMPLETED,
         FAILED,
         REFUNDED,

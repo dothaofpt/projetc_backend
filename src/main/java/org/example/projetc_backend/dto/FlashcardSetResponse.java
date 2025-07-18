@@ -10,5 +10,5 @@ public record FlashcardSetResponse(
         Integer creatorUserId,
         Boolean isSystemCreated,
         LocalDateTime createdAt,
-        List<VocabularyResponse> vocabularies // Có thể bao gồm danh sách từ vựng trong bộ
+        List<FlashcardResponse> flashcards // ĐÃ THAY ĐỔI TỪ vocabularies SANG flashcards
 ) {}

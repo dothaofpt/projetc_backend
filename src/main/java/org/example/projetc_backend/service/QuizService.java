@@ -2,8 +2,8 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.QuizRequest;
 import org.example.projetc_backend.dto.QuizResponse;
-import org.example.projetc_backend.dto.QuizSearchRequest; // Giữ nguyên
-import org.example.projetc_backend.dto.QuizPageResponse; // Giữ nguyên
+import org.example.projetc_backend.dto.QuizSearchRequest;
+import org.example.projetc_backend.dto.QuizPageResponse;
 import org.example.projetc_backend.entity.Lesson;
 import org.example.projetc_backend.entity.Quiz;
 import org.example.projetc_backend.repository.LessonRepository;
@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional // Đặt Transactional ở cấp độ class
+@Transactional
 public class QuizService {
     private static final Logger logger = LoggerFactory.getLogger(QuizService.class);
     private final QuizRepository quizRepository;
@@ -41,7 +41,6 @@ public class QuizService {
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ hoặc không tìm thấy Lesson.
      */
     public QuizResponse createQuiz(QuizRequest request) {
-        // Đã thay đổi: skill() thành quizType()
         if (request == null || request.lessonId() == null || request.title() == null || request.quizType() == null) {
             throw new IllegalArgumentException("Lesson ID, tiêu đề và loại bài kiểm tra là bắt buộc.");
         }
@@ -59,7 +58,6 @@ public class QuizService {
         Quiz quiz = new Quiz();
         quiz.setLesson(lesson);
         quiz.setTitle(request.title().trim());
-        // Đã thay đổi: setSkill() thành setQuizType()
         quiz.setQuizType(request.quizType());
         quiz.setCreatedAt(LocalDateTime.now());
 
@@ -79,6 +77,7 @@ public class QuizService {
         if (quizId == null) {
             throw new IllegalArgumentException("Quiz ID không được để trống.");
         }
+        // Đảm bảo Lesson được fetch cùng để lấy tên
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài kiểm tra với ID: " + quizId));
         return mapToQuizResponse(quiz);
@@ -98,6 +97,7 @@ public class QuizService {
         if (!lessonRepository.existsById(lessonId)) {
             throw new IllegalArgumentException("Không tìm thấy bài học với ID: " + lessonId);
         }
+        // Giả sử findByLessonLessonId đã fetch Lesson hoặc Lesson được tải qua @ManyToOne mặc định
         return quizRepository.findByLessonLessonId(lessonId).stream()
                 .map(this::mapToQuizResponse)
                 .collect(Collectors.toList());
@@ -110,6 +110,7 @@ public class QuizService {
     @Transactional(readOnly = true)
     public List<QuizResponse> getAllQuizzes() {
         logger.info("Đang lấy tất cả quizzes.");
+        // Đảm bảo Lesson được fetch cùng để lấy tên
         return quizRepository.findAll().stream()
                 .map(this::mapToQuizResponse)
                 .collect(Collectors.toList());
@@ -128,14 +129,15 @@ public class QuizService {
             throw new IllegalArgumentException("Search request không được để trống.");
         }
 
-        // SỬA LỖI: Sử dụng accessor methods cho các trường của Record DTO
         Sort sort = Sort.by(request.sortDir().equalsIgnoreCase("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, request.sortBy());
         PageRequest pageable = PageRequest.of(request.page(), request.size(), sort);
 
+        // Đây là nơi cần đảm bảo Lesson được JOIN FETCH nếu nó là LAZY
+        // Ví dụ: Tạo một phương thức searchWithLesson trong QuizRepository và gọi ở đây
         Page<Quiz> quizPage = quizRepository.searchQuizzes(
                 request.lessonId(),
                 request.title(),
-                request.quizType(), // Đã thay đổi: skill() thành quizType()
+                request.quizType(),
                 pageable
         );
 
@@ -161,7 +163,6 @@ public class QuizService {
      */
     @Transactional
     public QuizResponse updateQuiz(Integer quizId, QuizRequest request) {
-        // Đã thay đổi: skill() thành quizType()
         if (quizId == null || request == null || request.lessonId() == null || request.title() == null || request.quizType() == null) {
             throw new IllegalArgumentException("Quiz ID, Lesson ID, tiêu đề và loại bài kiểm tra là bắt buộc.");
         }
@@ -182,7 +183,6 @@ public class QuizService {
 
         quiz.setLesson(lesson);
         quiz.setTitle(request.title().trim());
-        // Đã thay đổi: setSkill() thành setQuizType()
         quiz.setQuizType(request.quizType());
 
         quiz = quizRepository.save(quiz);
@@ -213,12 +213,29 @@ public class QuizService {
      * @return Đối tượng QuizResponse DTO tương ứng.
      */
     private QuizResponse mapToQuizResponse(Quiz quiz) {
+        // Lấy tên bài học từ Lesson entity liên kết.
+        // Đảm bảo Lesson đã được tải (fetched) trước khi truy cập quiz.getLesson().getTitle()
+        String lessonTitle = null;
+        if (quiz.getLesson() != null) {
+            // Tránh LazyInitializationException nếu Lesson được fetch LAZY
+            // Đây là điểm quan trọng: nếu Lesson là LAZY, bạn cần đảm bảo nó đã được tải.
+            // Ví dụ, nếu bạn dùng findAll(), findByLessonLessonId(), searchQuizzes()
+            // thì phải JOIN FETCH lesson trong truy vấn hoặc đặt @ManyToOne là EAGER (không khuyến nghị EAGER)
+            try {
+                lessonTitle = quiz.getLesson().getTitle();
+            } catch (Exception e) {
+                logger.error("Could not fetch lesson title for quizId {}: {}", quiz.getQuizId(), e.getMessage());
+                // Xử lý lỗi, có thể trả về null hoặc một thông báo mặc định
+            }
+        }
+
         return new QuizResponse(
                 quiz.getQuizId(),
                 quiz.getLesson() != null ? quiz.getLesson().getLessonId() : null,
                 quiz.getTitle(),
-                quiz.getQuizType(), // Đã thay đổi: getSkill() thành getQuizType()
-                quiz.getCreatedAt()
+                quiz.getQuizType(),
+                quiz.getCreatedAt(),
+                lessonTitle // <-- Truyền tên bài học vào DTO
         );
     }
 }

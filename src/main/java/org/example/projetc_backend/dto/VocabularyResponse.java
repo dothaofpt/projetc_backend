@@ -1,6 +1,7 @@
+// VocabularyResponse
 package org.example.projetc_backend.dto;
 
-import org.example.projetc_backend.entity.Vocabulary; // Import enum từ entity
+import org.example.projetc_backend.entity.Vocabulary;
 
 public record VocabularyResponse(
         Integer wordId,
@@ -9,7 +10,7 @@ public record VocabularyResponse(
         String exampleSentence,
         String pronunciation,
         String audioUrl,
-        String imageUrl, // Bổ sung
+        String imageUrl,
         String writingPrompt,
-        Vocabulary.DifficultyLevel difficultyLevel // Sử dụng enum trực tiếp
+        Vocabulary.DifficultyLevel difficultyLevel
 ) {}

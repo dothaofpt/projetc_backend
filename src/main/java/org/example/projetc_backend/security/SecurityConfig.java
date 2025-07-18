@@ -39,22 +39,37 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/quizzes/**", "/api/vocabulary/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lessons/**").permitAll()
+
+                        // ====================================================================
+                        // BỔ SUNG QUY TẮC CHO CÁC API PRACTICE ACTIVITIES
+                        // ====================================================================
+                        // Cho phép truy cập GET tới tất cả các hoạt động luyện tập cho USER và ADMIN
+                        // Hoặc bạn có thể chọn permitAll() nếu muốn công khai hoàn toàn
+                        .requestMatchers(HttpMethod.GET, "/api/practice-activities/**").hasAnyRole("USER", "ADMIN")
+                        // Hoặc nếu bạn muốn hoàn toàn công khai, không cần đăng nhập để xem danh sách:
+                        // .requestMatchers(HttpMethod.GET, "/api/practice-activities/**").permitAll()
+
+
+                        // Các API POST, PUT, DELETE cho hoạt động luyện tập chỉ dành cho ADMIN
+                        .requestMatchers(HttpMethod.POST, "/api/practice-activities/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/practice-activities/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/practice-activities/**").hasRole("ADMIN")
+
+                        // ====================================================================
+                        // KẾT THÚC BỔ SUNG
+                        // ====================================================================
+
+                        // Existing rules:
                         .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lessons/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("ADMIN")
                         .requestMatchers("/api/stats").hasRole("ADMIN")
                         .requestMatchers("/api/questions/**", "/api/answers/**", "/api/learning-materials/**").hasRole("ADMIN")
-
-                        // Thêm các endpoint PayPal vào danh sách được phép truy cập công khai
                         .requestMatchers("/api/payments/paypal/complete", "/api/payments/paypal/cancel").permitAll()
-
-                        // Add flashcard-sets endpoints
                         .requestMatchers(HttpMethod.GET, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
                         .requestMatchers(HttpMethod.POST, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
                         .requestMatchers(HttpMethod.PUT, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/flashcard-sets/**").hasAnyRole("ADMIN", "USER")
-
-                        // Protected endpoints
                         .requestMatchers("/api/progress/**", "/api/quiz-results/**", "/api/user-flashcards/**")
                         .hasAnyRole("ADMIN", "USER")
 
@@ -85,7 +100,7 @@ public class SecurityConfig {
                 "http://localhost:8080",
                 "http://localhost:61299",
                 "http://192.168.2.12:8080",
-                "http://10.24.27.184:8080" // Thêm địa chỉ IP mới vào đây
+                "http://10.24.27.184:8080"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
