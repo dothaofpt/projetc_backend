@@ -16,7 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Transactional; // Đảm bảo import này
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
@@ -51,17 +51,14 @@ public class PaymentService {
 
     @Transactional
     public String initiatePayPalPayment(PaymentRequest request) throws PayPalRESTException {
-        // Lấy đối tượng Principal từ SecurityContextHolder
+        // ... (logic hiện có)
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        // Kiểm tra và ép kiểu an toàn
         if (!(principal instanceof org.springframework.security.core.userdetails.User)) {
             throw new AccessDeniedException("Người dùng chưa được xác thực hoặc kiểu đối tượng không đúng.");
         }
         org.springframework.security.core.userdetails.User springUser =
                 (org.springframework.security.core.userdetails.User) principal;
 
-        // Tìm kiếm thực thể User của bạn trong cơ sở dữ liệu bằng username
         User currentUser = userRepository.findByUsername(springUser.getUsername())
                 .orElseThrow(() -> new AccessDeniedException("Không tìm thấy người dùng trong cơ sở dữ liệu."));
 
@@ -111,6 +108,7 @@ public class PaymentService {
 
     @Transactional
     public Map<String, String> completePayPalPayment(String paymentId, String payerId) throws PayPalRESTException {
+        // ... (logic hiện có)
         Payment localPayment = paymentRepository.findByTransactionId(paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch với ID: " + paymentId));
 
@@ -145,6 +143,7 @@ public class PaymentService {
 
     @Transactional
     public Map<String, String> cancelPayPalPayment(String token) {
+        // ... (logic hiện có)
         Payment localPayment = paymentRepository.findByTransactionId(token)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch với token: " + token));
 
@@ -174,26 +173,37 @@ public class PaymentService {
             }
         }
     }
+
+    // THÊM @Transactional(readOnly = true) VÀO ĐÂY!
+    @Transactional(readOnly = true)
     public PaymentResponse getPaymentById(Integer paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thanh toán với ID: " + paymentId));
         return mapToPaymentResponse(payment);
     }
 
+    // THÊM @Transactional(readOnly = true) VÀO ĐÂY!
+    @Transactional(readOnly = true)
     public List<PaymentResponse> getAllPayments() {
         return paymentRepository.findAll(Sort.by(Sort.Direction.DESC, "paymentDate")).stream()
                 .map(this::mapToPaymentResponse)
                 .collect(Collectors.toList());
     }
 
+    // THÊM @Transactional(readOnly = true) VÀO ĐÂY!
+    @Transactional(readOnly = true)
     public List<PaymentResponse> getPaymentsByUserId(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + userId));
+        // Đảm bảo user được initialize trong session trước khi map
+        // Bạn có thể thêm user.getUsername(); // hoặc bất kỳ getter nào để kích hoạt tải EAGER/proxy
         return paymentRepository.findByUser(user).stream()
                 .map(this::mapToPaymentResponse)
                 .collect(Collectors.toList());
     }
 
+    // THÊM @Transactional(readOnly = true) VÀO ĐÂY!
+    @Transactional(readOnly = true)
     public Page<PaymentResponse> searchPayments(PaymentSearchRequest request) {
         Sort sort = Sort.by(request.sortDir().equalsIgnoreCase("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, request.sortBy());
         PageRequest pageable = PageRequest.of(request.page(), request.size(), sort);
@@ -201,6 +211,7 @@ public class PaymentService {
                 request.userId(), request.orderId(), request.paymentMethod(),
                 request.transactionId(), request.status(), pageable
         );
+        // Việc map diễn ra trong Transaction, User proxy có thể được tải
         return payments.map(this::mapToPaymentResponse);
     }
 
@@ -213,6 +224,8 @@ public class PaymentService {
     }
 
     private PaymentResponse mapToPaymentResponse(Payment payment) {
+        // user.getFullName() và user.getEmail() sẽ được tải khi truy cập
+        // vì chúng ta đang trong một giao dịch @Transactional
         UserResponse userResponse = new UserResponse(
                 payment.getUser().getUserId(),
                 payment.getUser().getUsername(),
