@@ -5,12 +5,15 @@ import java.time.LocalDateTime;
 public record UserWritingAttemptResponse(
         Integer attemptId,
         Integer userId,
-        Integer practiceActivityId, // Changed from questionId
-        // Removed String originalPromptText,
+        Integer practiceActivityId,
         String userWrittenText,
-        String grammarFeedback,
-        String spellingFeedback,
-        String cohesionFeedback,
-        Integer overallScore,
-        LocalDateTime attemptDate
+        String grammarFeedback,    // Backend sẽ tạo ra
+        String spellingFeedback,   // Backend sẽ tạo ra
+        String cohesionFeedback,   // Backend sẽ tạo ra
+        Integer overallScore,      // Backend sẽ tính
+        LocalDateTime attemptDate,
+        // MỚI: Các trường từ PracticeActivity để hiển thị thông tin bài viết gốc/đề bài
+        String practiceActivityTitle, // Tiêu đề của PracticeActivity
+        String originalPromptText,    // promptText của PracticeActivity
+        String expectedOutputText     // expectedOutputText của PracticeActivity (hoặc transcriptText)
 ) {}

@@ -2,7 +2,7 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.UserListeningAttemptRequest;
 import org.example.projetc_backend.dto.UserListeningAttemptResponse;
-import org.example.projetc_backend.dto.UserListeningAttemptSearchRequest; // Import DTO mới
+import org.example.projetc_backend.dto.UserListeningAttemptSearchRequest;
 import org.example.projetc_backend.entity.UserListeningAttempt;
 import org.example.projetc_backend.entity.User;
 import org.example.projetc_backend.entity.PracticeActivity;
@@ -10,10 +10,10 @@ import org.example.projetc_backend.repository.UserListeningAttemptRepository;
 import org.example.projetc_backend.repository.UserRepository;
 import org.example.projetc_backend.repository.PracticeActivityRepository;
 
-import org.springframework.data.domain.Page; // Import Page
-import org.springframework.data.domain.PageRequest; // Import PageRequest
-import org.springframework.data.domain.Pageable; // Import Pageable
-import org.springframework.data.domain.Sort; // Import Sort
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,9 +22,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+// MỚI: Thêm import cho Logger
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 @Transactional
 public class UserListeningAttemptService {
+
+    // MỚI: Khai báo và khởi tạo Logger
+    private static final Logger logger = LoggerFactory.getLogger(UserListeningAttemptService.class);
 
     private final UserListeningAttemptRepository userListeningAttemptRepository;
     private final UserRepository userRepository;
@@ -39,19 +46,15 @@ public class UserListeningAttemptService {
     }
 
     /**
-     * Lưu một lần thử nghe của người dùng.
-     * @param request Dữ liệu yêu cầu cho lần thử nghe.
+     * Lưu một lần thử nghe của người dùng và tính điểm chính xác tại backend.
+     * @param request Dữ liệu yêu cầu cho lần thử nghe (không có accuracyScore).
      * @return UserListeningAttemptResponse của lần thử nghe đã lưu.
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ.
      */
     public UserListeningAttemptResponse saveListeningAttempt(UserListeningAttemptRequest request) {
         if (request == null || request.userId() == null || request.practiceActivityId() == null ||
-                request.userTranscribedText() == null || request.userTranscribedText().trim().isEmpty() ||
-                request.accuracyScore() == null) {
-            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userTranscribedText, accuracyScore) không được để trống.");
-        }
-        if (request.accuracyScore() < 0 || request.accuracyScore() > 100) {
-            throw new IllegalArgumentException("Điểm chính xác phải nằm trong khoảng từ 0 đến 100.");
+                request.userTranscribedText() == null || request.userTranscribedText().trim().isEmpty()) {
+            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userTranscribedText) không được để trống.");
         }
 
         User user = userRepository.findById(request.userId())
@@ -60,11 +63,18 @@ public class UserListeningAttemptService {
         PracticeActivity practiceActivity = practiceActivityRepository.findById(request.practiceActivityId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + request.practiceActivityId()));
 
+        String actualTranscript = practiceActivity.getTranscriptText();
+        if (actualTranscript == null || actualTranscript.trim().isEmpty()) {
+            logger.warn("PracticeActivity (ID: {}) for listening attempt has no actual transcript text. Accuracy score will be 0.", request.practiceActivityId());
+        }
+
+        int accuracyScore = calculateListeningAccuracy(request.userTranscribedText(), actualTranscript);
+
         UserListeningAttempt attempt = new UserListeningAttempt();
         attempt.setUser(user);
         attempt.setPracticeActivity(practiceActivity);
         attempt.setUserTranscribedText(request.userTranscribedText().trim());
-        attempt.setAccuracyScore(request.accuracyScore());
+        attempt.setAccuracyScore(accuracyScore);
         attempt.setAttemptDate(LocalDateTime.now());
 
         attempt = userListeningAttemptRepository.save(attempt);
@@ -83,32 +93,27 @@ public class UserListeningAttemptService {
             throw new IllegalArgumentException("Attempt ID không được để trống.");
         }
         if (request == null || request.userId() == null || request.practiceActivityId() == null ||
-                request.userTranscribedText() == null || request.userTranscribedText().trim().isEmpty() ||
-                request.accuracyScore() == null) {
-            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userTranscribedText, accuracyScore) không được để trống.");
-        }
-        if (request.accuracyScore() < 0 || request.accuracyScore() > 100) {
-            throw new IllegalArgumentException("Điểm chính xác phải nằm trong khoảng từ 0 đến 100.");
+                request.userTranscribedText() == null || request.userTranscribedText().trim().isEmpty()) {
+            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userTranscribedText) không được để trống.");
         }
 
         UserListeningAttempt existingAttempt = userListeningAttemptRepository.findById(attemptId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lần thử nghe với ID: " + attemptId));
 
-        // Kiểm tra user và practiceActivity có tồn tại không
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
         PracticeActivity practiceActivity = practiceActivityRepository.findById(request.practiceActivityId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + request.practiceActivityId()));
 
-        // Cập nhật các trường
-        existingAttempt.setUser(user); // Có thể thay đổi người dùng (nếu logic cho phép)
-        existingAttempt.setPracticeActivity(practiceActivity); // Có thể thay đổi hoạt động (nếu logic cho phép)
-        existingAttempt.setUserTranscribedText(request.userTranscribedText().trim());
-        existingAttempt.setAccuracyScore(request.accuracyScore());
-        // Không cập nhật attemptDate ở đây vì nó là thời gian tạo ban đầu, trừ khi có yêu cầu cụ thể
-        // existingAttempt.setAttemptDate(LocalDateTime.now()); // Nếu bạn muốn cập nhật thời gian sửa đổi
+        String actualTranscript = practiceActivity.getTranscriptText();
+        int accuracyScore = calculateListeningAccuracy(request.userTranscribedText(), actualTranscript);
 
-        existingAttempt = userListeningAttemptRepository.save(existingAttempt); // Lưu lại bản cập nhật
+        existingAttempt.setUser(user);
+        existingAttempt.setPracticeActivity(practiceActivity);
+        existingAttempt.setUserTranscribedText(request.userTranscribedText().trim());
+        existingAttempt.setAccuracyScore(accuracyScore);
+
+        existingAttempt = userListeningAttemptRepository.save(existingAttempt);
         return mapToUserListeningAttemptResponse(existingAttempt);
     }
 
@@ -169,7 +174,6 @@ public class UserListeningAttemptService {
     }
 
 
-
     /**
      * Tìm kiếm và phân trang các lần thử nghe của người dùng.
      * @param searchRequest DTO chứa các tiêu chí tìm kiếm và thông tin phân trang.
@@ -177,14 +181,12 @@ public class UserListeningAttemptService {
      */
     @Transactional(readOnly = true)
     public Page<UserListeningAttemptResponse> searchAndPaginateListeningAttempts(UserListeningAttemptSearchRequest searchRequest) {
-        // Tạo đối tượng Pageable từ DTO tìm kiếm
         Pageable pageable = PageRequest.of(
                 searchRequest.page(),
                 searchRequest.size(),
-                Sort.by("attemptDate").descending() // Sắp xếp theo ngày thử giảm dần
+                Sort.by("attemptDate").descending()
         );
 
-        // Gọi phương thức tìm kiếm từ Repository
         Page<UserListeningAttempt> attemptsPage = userListeningAttemptRepository.searchListeningAttempts(
                 searchRequest.userId(),
                 searchRequest.practiceActivityId(),
@@ -193,10 +195,8 @@ public class UserListeningAttemptService {
                 pageable
         );
 
-        // Ánh xạ Page của Entity sang Page của DTO Response
         return attemptsPage.map(this::mapToUserListeningAttemptResponse);
     }
-
 
 
     /**
@@ -220,13 +220,59 @@ public class UserListeningAttemptService {
      * @return UserListeningAttemptResponse DTO.
      */
     private UserListeningAttemptResponse mapToUserListeningAttemptResponse(UserListeningAttempt attempt) {
+        String practiceActivityTitle = null;
+        String audioMaterialUrl = null;
+        String actualTranscriptText = null;
+
+        if (attempt.getPracticeActivity() != null) {
+            practiceActivityTitle = attempt.getPracticeActivity().getTitle();
+            audioMaterialUrl = attempt.getPracticeActivity().getMaterialUrl();
+            actualTranscriptText = attempt.getPracticeActivity().getTranscriptText();
+        }
+
         return new UserListeningAttemptResponse(
                 attempt.getAttemptId(),
                 attempt.getUser().getUserId(),
                 attempt.getPracticeActivity() != null ? attempt.getPracticeActivity().getActivityId() : null,
                 attempt.getUserTranscribedText(),
                 attempt.getAccuracyScore(),
-                attempt.getAttemptDate()
+                attempt.getAttemptDate(),
+                practiceActivityTitle,
+                audioMaterialUrl,
+                actualTranscriptText
         );
+    }
+
+    /**
+     * Logic tính toán điểm chính xác cho bài nghe.
+     * @param userText Văn bản người dùng đã gõ.
+     * @param actualText Văn bản gốc (đáp án đúng).
+     * @return Điểm chính xác từ 0 đến 100.
+     */
+    private int calculateListeningAccuracy(String userText, String actualText) {
+        if (actualText == null || actualText.trim().isEmpty()) {
+            return 0;
+        }
+
+        // Chuẩn hóa văn bản: chuyển về chữ thường, bỏ dấu câu (tùy ý)
+        String normalizedUserText = userText.trim().toLowerCase().replaceAll("[^a-z0-9\\s]", "");
+        String normalizedActualText = actualText.trim().toLowerCase().replaceAll("[^a-z0-9\\s]", "");
+
+        String[] userWords = normalizedUserText.split("\\s+");
+        String[] actualWords = normalizedActualText.split("\\s+");
+
+        if (actualWords.length == 0) {
+            return userWords.length == 0 ? 100 : 0;
+        }
+
+        int correctWords = 0;
+        for (int i = 0; i < Math.min(userWords.length, actualWords.length); i++) {
+            if (userWords[i].equals(actualWords[i])) {
+                correctWords++;
+            }
+        }
+
+        double accuracy = (double) correctWords / actualWords.length;
+        return (int) Math.round(accuracy * 100);
     }
 }

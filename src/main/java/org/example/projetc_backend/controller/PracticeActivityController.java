@@ -27,7 +27,7 @@ public class PracticeActivityController {
     /**
      * Tạo một hoạt động luyện tập mới.
      * Chỉ ADMIN mới có quyền.
-     * @param request DTO chứa thông tin hoạt động luyện tập.
+     * @param request DTO chứa thông tin hoạt động luyện tập. (Bao gồm materialUrl, transcriptText, promptText, expectedOutputText)
      * @return ResponseEntity với PracticeActivityResponse của hoạt động đã tạo.
      */
     @PostMapping
@@ -37,7 +37,10 @@ public class PracticeActivityController {
             PracticeActivityResponse response = practiceActivityService.createPracticeActivity(request);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null); // Trả về null với BAD_REQUEST
+            // Trả về một phản hồi lỗi rõ ràng hơn thay vì chỉ null
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new PracticeActivityResponse(null, null, e.getMessage(), null, null, null, null, null, null, null, null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -45,7 +48,7 @@ public class PracticeActivityController {
      * Lấy thông tin hoạt động luyện tập theo ID.
      * Có thể truy cập công khai.
      * @param activityId ID của hoạt động luyện tập.
-     * @return ResponseEntity với PracticeActivityResponse.
+     * @return ResponseEntity với PracticeActivityResponse. (Bao gồm materialUrl, transcriptText, promptText, expectedOutputText)
      */
     @GetMapping("/{activityId}")
     public ResponseEntity<PracticeActivityResponse> getPracticeActivityById(@PathVariable Integer activityId) {
@@ -54,6 +57,8 @@ public class PracticeActivityController {
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -61,7 +66,7 @@ public class PracticeActivityController {
      * Lấy danh sách các hoạt động luyện tập theo ID bài học.
      * Có thể truy cập công khai.
      * @param lessonId ID của bài học.
-     * @return ResponseEntity với danh sách PracticeActivityResponse.
+     * @return ResponseEntity với danh sách PracticeActivityResponse. (Bao gồm materialUrl, transcriptText, promptText, expectedOutputText)
      */
     @GetMapping("/lesson/{lessonId}")
     public ResponseEntity<List<PracticeActivityResponse>> getPracticeActivitiesByLessonId(@PathVariable Integer lessonId) {
@@ -70,13 +75,15 @@ public class PracticeActivityController {
             return new ResponseEntity<>(responses, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
     /**
      * Lấy tất cả các hoạt động luyện tập hiện có trong hệ thống.
      * Có thể truy cập công khai.
-     * @return ResponseEntity với danh sách PracticeActivityResponse.
+     * @return ResponseEntity với danh sách PracticeActivityResponse. (Bao gồm materialUrl, transcriptText, promptText, expectedOutputText)
      */
     @GetMapping
     public ResponseEntity<List<PracticeActivityResponse>> getAllPracticeActivities() {
@@ -94,14 +101,14 @@ public class PracticeActivityController {
      * @param size Kích thước trang (mặc định 10).
      * @param sortBy Trường để sắp xếp (mặc định "activityId").
      * @param sortDir Hướng sắp xếp (mặc định "ASC").
-     * @return ResponseEntity với một trang (Page) các PracticeActivityResponse.
+     * @return ResponseEntity với một trang (Page) các PracticeActivityResponse. (Bao gồm materialUrl, transcriptText, promptText, expectedOutputText)
      */
     @GetMapping("/search")
     public ResponseEntity<PracticeActivityPageResponse> searchPracticeActivities(
             @RequestParam(required = false) Integer lessonId,
             @RequestParam(required = false) String title,
-            @RequestParam(required = false) PracticeActivity.ActivitySkill skill, // Sử dụng enum trực tiếp
-            @RequestParam(required = false) PracticeActivity.ActivityType activityType, // Sử dụng enum trực tiếp
+            @RequestParam(required = false) PracticeActivity.ActivitySkill skill,
+            @RequestParam(required = false) PracticeActivity.ActivityType activityType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "activityId") String sortBy,
@@ -113,6 +120,8 @@ public class PracticeActivityController {
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -121,7 +130,7 @@ public class PracticeActivityController {
      * Cập nhật thông tin của một hoạt động luyện tập.
      * Chỉ ADMIN mới có quyền.
      * @param activityId ID của hoạt động luyện tập.
-     * @param request DTO chứa thông tin cập nhật.
+     * @param request DTO chứa thông tin cập nhật. (Bao gồm materialUrl, transcriptText, promptText, expectedOutputText)
      * @return ResponseEntity với PracticeActivityResponse đã cập nhật.
      */
     @PutMapping("/{activityId}")
@@ -133,6 +142,8 @@ public class PracticeActivityController {
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -150,6 +161,8 @@ public class PracticeActivityController {
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 }

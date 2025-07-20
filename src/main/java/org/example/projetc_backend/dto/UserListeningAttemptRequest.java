@@ -7,12 +7,9 @@ import jakarta.validation.constraints.Min;
 public record UserListeningAttemptRequest(
         @NotNull(message = "User ID is required")
         Integer userId,
-        @NotNull(message = "Practice Activity ID is required") // Changed from questionId
-        Integer practiceActivityId,
-        // Removed @NotBlank(message = "Audio material URL is required") String audioMaterialUrl,
+        @NotNull(message = "Practice Activity ID is required")
+        Integer practiceActivityId, // ID của PracticeActivity chứa audioUrl và transcriptText
         @NotBlank(message = "User transcribed text is required")
-        String userTranscribedText,
-        // Removed @NotBlank(message = "Actual transcript text is required") String actualTranscriptText,
-        @NotNull(message = "Accuracy score is required")
-        @Min(0) Integer accuracyScore
+        String userTranscribedText
+        // BỎ `accuracyScore` khỏi Request. Backend sẽ tự chấm.
 ) {}

@@ -7,13 +7,9 @@ import jakarta.validation.constraints.Min;
 public record UserWritingAttemptRequest(
         @NotNull(message = "User ID is required")
         Integer userId,
-        @NotNull(message = "Practice Activity ID is required") // Changed from questionId
-        Integer practiceActivityId,
-        // Removed @NotBlank(message = "Original prompt text is required") String originalPromptText,
+        @NotNull(message = "Practice Activity ID is required")
+        Integer practiceActivityId, // ID của PracticeActivity chứa promptText/transcriptText/expectedOutputText
         @NotBlank(message = "User written text is required")
-        String userWrittenText,
-        String grammarFeedback,
-        String spellingFeedback,
-        String cohesionFeedback,
-        @Min(0) Integer overallScore
+        String userWrittenText // Văn bản người dùng đã viết/điền
+        // BỎ các trường feedback và overallScore khỏi Request. Backend sẽ tự chấm.
 ) {}

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import org.hibernate.annotations.CreationTimestamp; // THÊM DÒNG IMPORT NÀY!
+import org.hibernate.annotations.UpdateTimestamp; // THÊM DÒNG IMPORT NÀY CHO UPDATEDAT
 
 @Entity
 @Table(name = "vocabulary")
@@ -15,7 +16,7 @@ public class Vocabulary {
     @Column(name = "word_id")
     private Integer wordId;
 
-    @Column(name = "word", nullable = false, unique = true, length = 255)
+    @Column(name = "word", nullable = false, unique = true, length = 255) // unique = true có thể gây lỗi nếu có từ đã xóa mềm
     private String word;
 
     @Column(name = "meaning", columnDefinition = "TEXT", nullable = false)
@@ -40,10 +41,17 @@ public class Vocabulary {
     @Column(name = "difficulty_level", nullable = false)
     private DifficultyLevel difficultyLevel;
 
-    // THÊM ANNOTATION @CreationTimestamp VÀO ĐÂY!
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false) // 'updatable = false' để cột này chỉ được set một lần khi tạo
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @UpdateTimestamp // THÊM ANNOTATION NÀY CHO UPDATEDAT
+    @Column(name = "updated_at") // CÓ THỂ THÊM CỘT updated_at
+    private LocalDateTime updatedAt;
+
+    // THÊM TRƯỜNG NÀY CHO XÓA MỀM
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false; // Mặc định là false (chưa xóa)
 
     // THUỘC TÍNH ÁNH XẠ MỐI QUAN HỆ TỚI FLASHCARD_SET_VOCABULARY
     @OneToMany(mappedBy = "vocabulary", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -126,14 +134,29 @@ public class Vocabulary {
         this.difficultyLevel = difficultyLevel;
     }
 
-    // Getter cho createdAt
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    // Setter cho createdAt (có thể không cần thiết nếu chỉ dùng @CreationTimestamp và updatable = false)
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    // Getter và Setter cho isDeleted
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
     }
 
     public Set<FlashcardSetVocabulary> getFlashcardSetVocabularies() {

@@ -2,18 +2,17 @@ package org.example.projetc_backend.service;
 
 import org.example.projetc_backend.dto.UserSpeakingAttemptRequest;
 import org.example.projetc_backend.dto.UserSpeakingAttemptResponse;
-import org.example.projetc_backend.dto.UserSpeakingAttemptSearchRequest; // Import DTO mới
+import org.example.projetc_backend.dto.UserSpeakingAttemptSearchRequest;
 import org.example.projetc_backend.entity.UserSpeakingAttempt;
 import org.example.projetc_backend.entity.User;
 import org.example.projetc_backend.entity.PracticeActivity;
 import org.example.projetc_backend.repository.UserSpeakingAttemptRepository;
 import org.example.projetc_backend.repository.UserRepository;
 import org.example.projetc_backend.repository.PracticeActivityRepository;
-
-import org.springframework.data.domain.Page; // Import Page
-import org.springframework.data.domain.PageRequest; // Import PageRequest
-import org.springframework.data.domain.Pageable; // Import Pageable
-import org.springframework.data.domain.Sort; // Import Sort
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,10 +20,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @Transactional
 public class UserSpeakingAttemptService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserSpeakingAttemptService.class);
 
     private final UserSpeakingAttemptRepository userSpeakingAttemptRepository;
     private final UserRepository userRepository;
@@ -40,42 +43,52 @@ public class UserSpeakingAttemptService {
 
     /**
      * Lưu một lần thử nói của người dùng.
-     * @param request Dữ liệu yêu cầu cho lần thử nói.
+     * Thực hiện chấm điểm phát âm/lưu loát tại backend bằng logic đơn giản.
+     * @param request Dữ liệu yêu cầu cho lần thử nói (có thể bao gồm userTranscribedBySTT từ frontend).
      * @return UserSpeakingAttemptResponse của lần thử nói đã lưu.
      * @throws IllegalArgumentException nếu dữ liệu không hợp lệ.
      */
     public UserSpeakingAttemptResponse saveSpeakingAttempt(UserSpeakingAttemptRequest request) {
-        // Đã thay đổi: questionId thành practiceActivityId, bỏ originalPromptText
         if (request == null || request.userId() == null || request.practiceActivityId() == null ||
-                request.userAudioUrl() == null || request.userAudioUrl().trim().isEmpty() ||
-                request.userTranscribedBySTT() == null || request.userTranscribedBySTT().trim().isEmpty() ||
-                request.pronunciationScore() == null || request.overallScore() == null) {
-            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userAudioUrl, userTranscribedBySTT, pronunciationScore, overallScore) không được để trống.");
-        }
-        if (request.pronunciationScore() < 0 || request.pronunciationScore() > 100 ||
-                request.overallScore() < 0 || request.overallScore() > 100) {
-            throw new IllegalArgumentException("Điểm phát âm và tổng thể phải nằm trong khoảng từ 0 đến 100.");
-        }
-        if (request.fluencyScore() != null && (request.fluencyScore() < 0 || request.fluencyScore() > 100)) {
-            throw new IllegalArgumentException("Điểm lưu loát phải nằm trong khoảng từ 0 đến 100.");
+                request.userAudioUrl() == null || request.userAudioUrl().trim().isEmpty()) {
+            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userAudioUrl) không được để trống.");
         }
 
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
 
-        // Đã thay đổi: Tìm PracticeActivity thay vì Question
         PracticeActivity practiceActivity = practiceActivityRepository.findById(request.practiceActivityId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + request.practiceActivityId()));
 
+        // --- MỚI: Logic chấm điểm đơn giản hơn (Không AI/ML phức tạp) ---
+        // Lấy văn bản gốc để so sánh (từ promptText hoặc transcriptText của PracticeActivity)
+        String originalTextToCompare = practiceActivity.getPromptText(); // Giả sử promptText là nội dung cần nói
+        if (originalTextToCompare == null || originalTextToCompare.trim().isEmpty()) {
+            originalTextToCompare = practiceActivity.getTranscriptText(); // Fallback nếu promptText rỗng
+        }
+
+        // Lấy văn bản chuyển đổi từ người dùng (do frontend gửi hoặc là null)
+        String userTranscribedBySTT = request.userTranscribedBySTT() != null ? request.userTranscribedBySTT().trim() : "";
+
+        // Tính toán các điểm số (Đơn giản hóa đáng kể)
+        Integer pronunciationScore = calculateSimplePronunciationScore(request.userAudioUrl()); // Dựa trên sự tồn tại của audio
+        Integer fluencyScore = calculateSimpleFluencyScore(request.userAudioUrl()); // Dựa trên sự tồn tại của audio
+        Integer overallScore = calculateSimpleSpeakingOverallScore(userTranscribedBySTT, originalTextToCompare); // Dựa trên so sánh văn bản
+
+        if (originalTextToCompare == null || originalTextToCompare.trim().isEmpty()) {
+            logger.warn("PracticeActivity (ID: {}) for speaking attempt has no original prompt/text to grade against. Overall score might be 0.", request.practiceActivityId());
+            overallScore = 0; // Nếu không có bản gốc, điểm tổng thể là 0
+        }
+        // --- END Logic chấm điểm đơn giản hơn ---
+
         UserSpeakingAttempt attempt = new UserSpeakingAttempt();
         attempt.setUser(user);
-        attempt.setPracticeActivity(practiceActivity); // Đã thay đổi: setPracticeActivity
-        // Đã bỏ: setOriginalPromptText vì đã có trong PracticeActivity
+        attempt.setPracticeActivity(practiceActivity);
         attempt.setUserAudioUrl(request.userAudioUrl().trim());
-        attempt.setUserTranscribedBySTT(request.userTranscribedBySTT().trim());
-        attempt.setPronunciationScore(request.pronunciationScore());
-        attempt.setFluencyScore(request.fluencyScore());
-        attempt.setOverallScore(request.overallScore());
+        attempt.setUserTranscribedBySTT(userTranscribedBySTT); // Lưu lại kết quả STT (dù từ frontend hay backend)
+        attempt.setPronunciationScore(pronunciationScore);
+        attempt.setFluencyScore(fluencyScore);
+        attempt.setOverallScore(overallScore);
         attempt.setAttemptDate(LocalDateTime.now());
 
         attempt = userSpeakingAttemptRepository.save(attempt);
@@ -94,49 +107,45 @@ public class UserSpeakingAttemptService {
             throw new IllegalArgumentException("Attempt ID không được để trống.");
         }
         if (request == null || request.userId() == null || request.practiceActivityId() == null ||
-                request.userAudioUrl() == null || request.userAudioUrl().trim().isEmpty() ||
-                request.userTranscribedBySTT() == null || request.userTranscribedBySTT().trim().isEmpty() ||
-                request.pronunciationScore() == null || request.overallScore() == null) {
-            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userAudioUrl, userTranscribedBySTT, pronunciationScore, overallScore) không được để trống.");
-        }
-        if (request.pronunciationScore() < 0 || request.pronunciationScore() > 100 ||
-                request.overallScore() < 0 || request.overallScore() > 100) {
-            throw new IllegalArgumentException("Điểm phát âm và tổng thể phải nằm trong khoảng từ 0 đến 100.");
-        }
-        if (request.fluencyScore() != null && (request.fluencyScore() < 0 || request.fluencyScore() > 100)) {
-            throw new IllegalArgumentException("Điểm lưu loát phải nằm trong khoảng từ 0 đến 100.");
+                request.userAudioUrl() == null || request.userAudioUrl().trim().isEmpty()) {
+            throw new IllegalArgumentException("Các trường bắt buộc (userId, practiceActivityId, userAudioUrl) không được để trống.");
         }
 
         UserSpeakingAttempt existingAttempt = userSpeakingAttemptRepository.findById(attemptId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lần thử nói với ID: " + attemptId));
 
-        // Kiểm tra user và practiceActivity có tồn tại không
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + request.userId()));
         PracticeActivity practiceActivity = practiceActivityRepository.findById(request.practiceActivityId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hoạt động luyện tập với ID: " + request.practiceActivityId()));
 
-        // Cập nhật các trường
+        // MỚI: Tính lại điểm và STT khi cập nhật (Logic đơn giản)
+        String originalTextToCompare = practiceActivity.getPromptText();
+        if (originalTextToCompare == null || originalTextToCompare.trim().isEmpty()) {
+            originalTextToCompare = practiceActivity.getTranscriptText();
+        }
+        String userTranscribedBySTT = request.userTranscribedBySTT() != null ? request.userTranscribedBySTT().trim() : "";
+
+        Integer pronunciationScore = calculateSimplePronunciationScore(request.userAudioUrl());
+        Integer fluencyScore = calculateSimpleFluencyScore(request.userAudioUrl());
+        Integer overallScore = calculateSimpleSpeakingOverallScore(userTranscribedBySTT, originalTextToCompare);
+
+        if (originalTextToCompare == null || originalTextToCompare.trim().isEmpty()) {
+            overallScore = 0;
+        }
+
         existingAttempt.setUser(user);
         existingAttempt.setPracticeActivity(practiceActivity);
         existingAttempt.setUserAudioUrl(request.userAudioUrl().trim());
-        existingAttempt.setUserTranscribedBySTT(request.userTranscribedBySTT().trim());
-        existingAttempt.setPronunciationScore(request.pronunciationScore());
-        existingAttempt.setFluencyScore(request.fluencyScore());
-        existingAttempt.setOverallScore(request.overallScore());
-        // Không cập nhật attemptDate ở đây vì nó là thời gian tạo ban đầu
+        existingAttempt.setUserTranscribedBySTT(userTranscribedBySTT);
+        existingAttempt.setPronunciationScore(pronunciationScore);
+        existingAttempt.setFluencyScore(fluencyScore);
+        existingAttempt.setOverallScore(overallScore);
 
-        existingAttempt = userSpeakingAttemptRepository.save(existingAttempt); // Lưu lại bản cập nhật
+        existingAttempt = userSpeakingAttemptRepository.save(existingAttempt);
         return mapToUserSpeakingAttemptResponse(existingAttempt);
     }
 
-    /**
-     * Lấy lần thử nói của người dùng theo ID.
-     * @param attemptId ID của lần thử nói.
-     * @return UserSpeakingAttemptResponse của lần thử nói.
-     * @throws IllegalArgumentException nếu attemptId trống hoặc không tìm thấy.
-     */
-    @Transactional(readOnly = true)
     public UserSpeakingAttemptResponse getSpeakingAttemptById(Integer attemptId) {
         if (attemptId == null) {
             throw new IllegalArgumentException("Attempt ID không được để trống.");
@@ -146,13 +155,6 @@ public class UserSpeakingAttemptService {
         return mapToUserSpeakingAttemptResponse(attempt);
     }
 
-    /**
-     * Lấy tất cả các lần thử nói của một người dùng.
-     * @param userId ID của người dùng.
-     * @return Danh sách UserSpeakingAttemptResponse.
-     * @throws IllegalArgumentException nếu userId không hợp lệ.
-     */
-    @Transactional(readOnly = true)
     public List<UserSpeakingAttemptResponse> getSpeakingAttemptsByUser(Integer userId) {
         if (userId == null) {
             throw new IllegalArgumentException("User ID không được để trống.");
@@ -166,13 +168,6 @@ public class UserSpeakingAttemptService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Lấy tất cả các lần thử nói cho một hoạt động luyện tập cụ thể.
-     * @param practiceActivityId ID của hoạt động luyện tập.
-     * @return Danh sách UserSpeakingAttemptResponse.
-     * @throws IllegalArgumentException nếu practiceActivityId không hợp lệ.
-     */
-    @Transactional(readOnly = true)
     public List<UserSpeakingAttemptResponse> getSpeakingAttemptsByPracticeActivity(Integer practiceActivityId) {
         if (practiceActivityId == null) {
             throw new IllegalArgumentException("Practice Activity ID không được để trống.");
@@ -186,23 +181,14 @@ public class UserSpeakingAttemptService {
                 .collect(Collectors.toList());
     }
 
-
-
-    /**
-     * Tìm kiếm và phân trang các lần thử nói của người dùng.
-     * @param searchRequest DTO chứa các tiêu chí tìm kiếm và thông tin phân trang.
-     * @return Trang chứa UserSpeakingAttemptResponse.
-     */
     @Transactional(readOnly = true)
     public Page<UserSpeakingAttemptResponse> searchAndPaginateSpeakingAttempts(UserSpeakingAttemptSearchRequest searchRequest) {
-        // Tạo đối tượng Pageable từ DTO tìm kiếm
         Pageable pageable = PageRequest.of(
                 searchRequest.page(),
                 searchRequest.size(),
-                Sort.by("attemptDate").descending() // Sắp xếp theo ngày thử giảm dần
+                Sort.by("attemptDate").descending()
         );
 
-        // Gọi phương thức tìm kiếm từ Repository
         Page<UserSpeakingAttempt> attemptsPage = userSpeakingAttemptRepository.searchSpeakingAttempts(
                 searchRequest.userId(),
                 searchRequest.practiceActivityId(),
@@ -211,17 +197,9 @@ public class UserSpeakingAttemptService {
                 pageable
         );
 
-        // Ánh xạ Page của Entity sang Page của DTO Response
         return attemptsPage.map(this::mapToUserSpeakingAttemptResponse);
     }
 
-
-
-    /**
-     * Xóa một lần thử nói của người dùng.
-     * @param attemptId ID của lần thử nói cần xóa.
-     * @throws IllegalArgumentException nếu attemptId trống hoặc không tìm thấy.
-     */
     public void deleteSpeakingAttempt(Integer attemptId) {
         if (attemptId == null) {
             throw new IllegalArgumentException("Attempt ID không được để trống.");
@@ -238,19 +216,74 @@ public class UserSpeakingAttemptService {
      * @return UserSpeakingAttemptResponse DTO.
      */
     private UserSpeakingAttemptResponse mapToUserSpeakingAttemptResponse(UserSpeakingAttempt attempt) {
+        String practiceActivityTitle = null;
+        String originalPromptText = null;
+        String expectedOutputText = null;
+
+        if (attempt.getPracticeActivity() != null) {
+            practiceActivityTitle = attempt.getPracticeActivity().getTitle();
+            originalPromptText = attempt.getPracticeActivity().getPromptText();
+            expectedOutputText = attempt.getPracticeActivity().getExpectedOutputText();
+        }
+
         return new UserSpeakingAttemptResponse(
                 attempt.getAttemptId(),
                 attempt.getUser().getUserId(),
-                // Đã thay đổi: Lấy ID của PracticeActivity
                 attempt.getPracticeActivity() != null ? attempt.getPracticeActivity().getActivityId() : null,
-                // Đã bỏ trường này khỏi DTO Response
-                // attempt.getOriginalPromptText(),
                 attempt.getUserAudioUrl(),
                 attempt.getUserTranscribedBySTT(),
                 attempt.getPronunciationScore(),
                 attempt.getFluencyScore(),
                 attempt.getOverallScore(),
-                attempt.getAttemptDate()
+                attempt.getAttemptDate(),
+                practiceActivityTitle,
+                originalPromptText,
+                expectedOutputText
         );
+    }
+
+    // MỚI: Hàm chấm điểm phát âm đơn giản
+    private Integer calculateSimplePronunciationScore(String audioUrl) {
+        // Đây là một placeholder đơn giản.
+        // Trong thực tế, việc chấm điểm phát âm đòi hỏi phân tích audio (AI/ML).
+        // Ví dụ: chỉ cho điểm nếu audio được cung cấp.
+        return audioUrl != null && !audioUrl.trim().isEmpty() ? 50 : 0; // Giả sử 50 điểm nếu có audio
+    }
+
+    // MỚI: Hàm chấm điểm lưu loát đơn giản
+    private Integer calculateSimpleFluencyScore(String audioUrl) {
+        // Tương tự, đây là một placeholder.
+        // Lưu loát thường được đánh giá qua tốc độ nói, khoảng dừng, v.v. (AI/ML).
+        return audioUrl != null && !audioUrl.trim().isEmpty() ? 50 : 0; // Giả sử 50 điểm nếu có audio
+    }
+
+    // Đã đổi tên hàm từ calculateOverallSpeakingScore để tránh nhầm lẫn nếu có chấm điểm phát âm/lưu loát riêng
+    private int calculateSimpleSpeakingOverallScore(String userTranscribedText, String originalText) {
+        if (originalText == null || originalText.trim().isEmpty()) {
+            return 0; // Không có bản gốc để chấm điểm
+        }
+        if (userTranscribedText == null || userTranscribedText.trim().isEmpty()) {
+            return 0; // Người dùng không nói gì
+        }
+
+        String normalizedUserText = userTranscribedText.trim().toLowerCase().replaceAll("[^a-z0-9\\s]", "");
+        String normalizedOriginalText = originalText.trim().toLowerCase().replaceAll("[^a-z0-9\\s]", "");
+
+        String[] userWords = normalizedUserText.split("\\s+");
+        String[] originalWords = normalizedOriginalText.split("\\s+");
+
+        if (originalWords.length == 0) {
+            return userWords.length == 0 ? 100 : 0;
+        }
+
+        int correctWords = 0;
+        for (int i = 0; i < Math.min(userWords.length, originalWords.length); i++) {
+            if (userWords[i].equals(originalWords[i])) {
+                correctWords++;
+            }
+        }
+
+        double accuracy = (double) correctWords / originalWords.length;
+        return (int) Math.round(accuracy * 100);
     }
 }

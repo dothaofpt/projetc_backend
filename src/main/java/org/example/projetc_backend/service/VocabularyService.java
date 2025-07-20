@@ -32,9 +32,9 @@ public class VocabularyService {
                 request.difficultyLevel() == null) {
             throw new IllegalArgumentException("Các trường bắt buộc (word, meaning, difficultyLevel) không được để trống.");
         }
-        // Kiểm tra trùng lặp từ vựng (không phân biệt chữ hoa/thường)
-        // SỬA: Dùng findByWordIgnoreCase để khớp với Repository và logic tốt hơn
-        if (vocabularyRepository.findByWordIgnoreCase(request.word().trim()).isPresent()) {
+        // Kiểm tra trùng lặp từ vựng CHƯA BỊ XÓA MỀM
+        // SỬA: Dùng findByWordIgnoreCaseAndIsDeletedFalse
+        if (vocabularyRepository.findByWordIgnoreCaseAndIsDeletedFalse(request.word().trim()).isPresent()) {
             throw new IllegalArgumentException("Từ vựng đã tồn tại: " + request.word());
         }
 
@@ -48,6 +48,7 @@ public class VocabularyService {
         vocabulary.setImageUrl(request.imageUrl() != null && !request.imageUrl().trim().isEmpty() ? request.imageUrl().trim() : null);
         vocabulary.setWritingPrompt(request.writingPrompt() != null && !request.writingPrompt().trim().isEmpty() ? request.writingPrompt().trim() : null);
         vocabulary.setDifficultyLevel(request.difficultyLevel());
+        vocabulary.setDeleted(false); // Đảm bảo khi tạo mới thì isDeleted là false
 
         // createdAt sẽ được tự động điền bởi @CreationTimestamp trong Entity, không cần set ở đây
 
@@ -60,7 +61,9 @@ public class VocabularyService {
         if (wordId == null) {
             throw new IllegalArgumentException("Word ID không được để trống.");
         }
+        // SỬA: Chỉ lấy từ vựng khi isDeleted là false
         Vocabulary vocabulary = vocabularyRepository.findById(wordId)
+                .filter(v -> !v.isDeleted()) // Thêm điều kiện filter để chỉ trả về từ vựng CHƯA XÓA MỀM
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + wordId));
         return mapToVocabularyResponse(vocabulary);
     }
@@ -69,7 +72,9 @@ public class VocabularyService {
     // Nếu không có mục đích cụ thể, có thể xóa.
     @Transactional(readOnly = true)
     public List<VocabularyResponse> getAllVocabulary() {
+        // SỬA: Chỉ lấy các từ vựng chưa bị xóa mềm
         return vocabularyRepository.findAll().stream()
+                .filter(v -> !v.isDeleted())
                 .map(this::mapToVocabularyResponse)
                 .collect(Collectors.toList());
     }
@@ -83,11 +88,16 @@ public class VocabularyService {
         Vocabulary vocabulary = vocabularyRepository.findById(wordId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + wordId));
 
-        // Kiểm tra trùng lặp từ vựng với các từ khác (trừ chính nó)
+        // SỬA: Kiểm tra nếu từ vựng đã bị xóa mềm thì không cho cập nhật
+        if (vocabulary.isDeleted()) {
+            throw new IllegalArgumentException("Không thể cập nhật từ vựng đã bị xóa.");
+        }
+
+        // Kiểm tra trùng lặp từ vựng với các từ khác (trừ chính nó) và chỉ xét các từ CHƯA BỊ XÓA MỀM
         if (request.word() != null && !request.word().trim().isEmpty() && !request.word().trim().equalsIgnoreCase(vocabulary.getWord())) {
-            // SỬA: Dùng findByWordIgnoreCase để khớp với Repository và logic tốt hơn
-            vocabularyRepository.findByWordIgnoreCase(request.word().trim())
-                    .filter(existing -> !existing.getWordId().equals(wordId))
+            // SỬA: Dùng findByWordIgnoreCaseAndIsDeletedFalse để khớp với Repository và logic tốt hơn
+            vocabularyRepository.findByWordIgnoreCaseAndIsDeletedFalse(request.word().trim())
+                    .filter(existing -> !existing.getWordId().equals(wordId)) // Đảm bảo không so sánh với chính từ vựng đang cập nhật
                     .ifPresent(existing -> {
                         throw new IllegalArgumentException("Từ vựng đã tồn tại: " + request.word());
                     });
@@ -96,7 +106,6 @@ public class VocabularyService {
             // Nếu từ vựng không thay đổi, hoặc chỉ thay đổi case, không cần kiểm tra trùng lặp với chính nó
             vocabulary.setWord(request.word().trim());
         }
-
 
         // Cập nhật các trường tùy chọn, chuẩn hóa null nếu rỗng
         if (request.meaning() != null) vocabulary.setMeaning(request.meaning().trim());
@@ -107,6 +116,8 @@ public class VocabularyService {
         if (request.writingPrompt() != null) vocabulary.setWritingPrompt(request.writingPrompt().trim().isEmpty() ? null : request.writingPrompt().trim());
         if (request.difficultyLevel() != null) vocabulary.setDifficultyLevel(request.difficultyLevel());
 
+        // updatedAt sẽ được tự động điền bởi @UpdateTimestamp trong Entity
+
         vocabulary = vocabularyRepository.save(vocabulary);
         return mapToVocabularyResponse(vocabulary);
     }
@@ -116,10 +127,16 @@ public class VocabularyService {
         if (wordId == null) {
             throw new IllegalArgumentException("Word ID không được để trống.");
         }
-        if (!vocabularyRepository.existsById(wordId)) { // Dùng existsById là hiệu quả
-            throw new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + wordId);
+        // SỬA: Thực hiện xóa mềm
+        Vocabulary vocabulary = vocabularyRepository.findById(wordId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy từ vựng với ID: " + wordId));
+
+        if (vocabulary.isDeleted()) {
+            throw new IllegalArgumentException("Từ vựng đã bị xóa."); // Hoặc có thể bỏ qua nếu đã xóa rồi
         }
-        vocabularyRepository.deleteById(wordId);
+
+        vocabulary.setDeleted(true); // Đánh dấu là đã xóa mềm
+        vocabularyRepository.save(vocabulary); // Lưu lại trạng thái đã xóa mềm
     }
 
     @Transactional(readOnly = true)
@@ -130,6 +147,7 @@ public class VocabularyService {
         String wordParam = searchRequest.word() != null ? searchRequest.word().trim() : null;
         String meaningParam = searchRequest.meaning() != null ? searchRequest.meaning().trim() : null;
 
+        // `searchVocabularies` trong Repository đã có điều kiện `isDeleted = false`
         Page<Vocabulary> vocabularyPage = vocabularyRepository.searchVocabularies(
                 wordParam,
                 meaningParam,

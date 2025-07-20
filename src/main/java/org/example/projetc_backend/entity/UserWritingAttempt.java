@@ -17,22 +17,22 @@ public class UserWritingAttempt {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "practice_activity_id", nullable = false) // Đã thay đổi: Liên kết với PracticeActivity
+    @JoinColumn(name = "practice_activity_id", nullable = false)
     private PracticeActivity practiceActivity;
 
-    @Column(name = "user_written_text", columnDefinition = "TEXT") // Văn bản người dùng đã viết
+    @Column(name = "user_written_text", columnDefinition = "TEXT")
     private String userWrittenText;
 
-    @Column(name = "grammar_feedback", columnDefinition = "TEXT") // Phản hồi về ngữ pháp
+    @Column(name = "grammar_feedback", columnDefinition = "TEXT")
     private String grammarFeedback;
 
-    @Column(name = "spelling_feedback", columnDefinition = "TEXT") // Phản hồi về chính tả
+    @Column(name = "spelling_feedback", columnDefinition = "TEXT")
     private String spellingFeedback;
 
-    @Column(name = "cohesion_feedback", columnDefinition = "TEXT") // Phản hồi về mạch lạc (nếu có thể tự động)
+    @Column(name = "cohesion_feedback", columnDefinition = "TEXT")
     private String cohesionFeedback;
 
-    @Column(name = "overall_score") // Điểm tổng thể của bài viết
+    @Column(name = "overall_score")
     private Integer overallScore;
 
     @Column(name = "attempt_date", nullable = false)

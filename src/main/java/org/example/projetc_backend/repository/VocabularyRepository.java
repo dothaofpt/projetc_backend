@@ -15,19 +15,24 @@ import java.util.Optional;
 public interface VocabularyRepository extends JpaRepository<Vocabulary, Integer> {
     List<Vocabulary> findByDifficultyLevel(Vocabulary.DifficultyLevel difficultyLevel);
 
-    // THÊM phương thức này để giải quyết lỗi 'findByWordIgnoreCase'
-    Optional<Vocabulary> findByWordIgnoreCase(String word);
+    // SỬA: Đảm bảo tìm kiếm từ vựng CHƯA BỊ XÓA MỀM khi kiểm tra trùng lặp
+    Optional<Vocabulary> findByWordIgnoreCaseAndIsDeletedFalse(String word);
 
-    // Bạn có thể giữ findByWord nếu có trường hợp sử dụng cụ thể,
-    // nhưng để kiểm tra trùng lặp không phân biệt chữ hoa/thường, findByWordIgnoreCase là tốt hơn.
-    Optional<Vocabulary> findByWord(String word);
+    // Bạn có thể xóa findByWord nếu không có trường hợp sử dụng cụ thể,
+    // hoặc giữ lại nếu bạn cần tìm kiếm chính xác (case-sensitive) cả từ đã xóa mềm.
+    // Với mục đích của soft delete, findByWordIgnoreCaseAndIsDeletedFalse là quan trọng nhất.
+    // Optional<Vocabulary> findByWord(String word);
 
-    boolean existsByWord(String word); // Giữ lại hoặc thay bằng findByWordIgnoreCase().isPresent()
+    // CŨ: boolean existsByWord(String word);
+    // MỚI: Nên dùng findByWordIgnoreCaseAndIsDeletedFalse().isPresent() cho logic chuẩn soft delete
+    // Hoặc nếu muốn kiểm tra tồn tại tổng thể (kể cả đã xóa mềm), hãy tạo phương thức mới.
 
+    // Cập nhật query để CHỈ TRẢ VỀ CÁC TỪ VỰNG CHƯA BỊ XÓA MỀM
     @Query("SELECT v FROM Vocabulary v WHERE " +
             "(:word IS NULL OR LOWER(v.word) LIKE LOWER(CONCAT('%', :word, '%'))) AND " +
             "(:meaning IS NULL OR LOWER(v.meaning) LIKE LOWER(CONCAT('%', :meaning, '%'))) AND " +
-            "(:difficultyLevel IS NULL OR v.difficultyLevel = :difficultyLevel)")
+            "(:difficultyLevel IS NULL OR v.difficultyLevel = :difficultyLevel) AND " +
+            "v.isDeleted = false") // THÊM ĐIỀU KIỆN QUAN TRỌNG NÀY
     Page<Vocabulary> searchVocabularies(
             @Param("word") String word,
             @Param("meaning") String meaning,

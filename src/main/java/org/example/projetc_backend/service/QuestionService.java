@@ -4,10 +4,12 @@ import org.example.projetc_backend.dto.QuestionRequest;
 import org.example.projetc_backend.dto.QuestionResponse;
 import org.example.projetc_backend.dto.QuestionSearchRequest;
 import org.example.projetc_backend.dto.QuestionPageResponse;
+import org.example.projetc_backend.dto.AnswerResponse; // MỚI: Import AnswerResponse
 import org.example.projetc_backend.entity.Question;
 import org.example.projetc_backend.entity.Quiz;
 import org.example.projetc_backend.repository.QuestionRepository;
 import org.example.projetc_backend.repository.QuizRepository;
+import org.example.projetc_backend.repository.AnswerRepository; // MỚI: Import AnswerRepository
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -24,10 +26,13 @@ public class QuestionService {
     private static final Logger logger = LoggerFactory.getLogger(QuestionService.class);
     private final QuestionRepository questionRepository;
     private final QuizRepository quizRepository;
+    private final AnswerRepository answerRepository; // MỚI: Khai báo AnswerRepository
 
-    public QuestionService(QuestionRepository questionRepository, QuizRepository quizRepository) {
+    // Cập nhật constructor để tiêm AnswerRepository
+    public QuestionService(QuestionRepository questionRepository, QuizRepository quizRepository, AnswerRepository answerRepository) {
         this.questionRepository = questionRepository;
         this.quizRepository = quizRepository;
+        this.answerRepository = answerRepository; // Tiêm AnswerRepository
     }
 
     /**
@@ -59,7 +64,7 @@ public class QuestionService {
 
         question = questionRepository.save(question);
 
-        return mapToQuestionResponse(question);
+        return mapToQuestionResponse(question); // Vẫn dùng mapToQuestionResponse để trả về DTO đầy đủ
     }
 
     /**
@@ -101,6 +106,7 @@ public class QuestionService {
                 .map(this::mapToQuestionResponse)
                 .collect(Collectors.toList());
     }
+
 
     /**
      * Tìm kiếm và phân trang câu hỏi dựa trên các tiêu chí tùy chọn.
@@ -196,11 +202,28 @@ public class QuestionService {
 
     /**
      * Phương thức trợ giúp để ánh xạ đối tượng Question entity sang QuestionResponse DTO.
+     * Bao gồm việc tải và ánh xạ các Answer liên quan.
      *
      * @param question Đối tượng Question entity.
      * @return Đối tượng QuestionResponse DTO tương ứng.
      */
     private QuestionResponse mapToQuestionResponse(Question question) {
+        // MỚI: Lấy tất cả các Answer (lựa chọn) cho câu hỏi này
+        // Lấy các câu trả lời chưa bị xóa mềm và đang hoạt động (isActive = true)
+        // để hiển thị cho người dùng cuối cùng (multiple choice options)
+        List<AnswerResponse> answers = answerRepository
+                .findByQuestionQuestionIdAndIsActiveTrue(question.getQuestionId()) // Có thể dùng findByQuestionQuestionIdAndIsActiveTrueAndIsDeletedFalse nếu muốn chặt hơn
+                .stream()
+                .map(ans -> new AnswerResponse(
+                        ans.getAnswerId(),
+                        ans.getQuestion().getQuestionId(),
+                        ans.getAnswerText(),
+                        ans.isCorrect(),
+                        ans.isActive(),
+                        ans.isDeleted()
+                ))
+                .collect(Collectors.toList());
+
         return new QuestionResponse(
                 question.getQuestionId(),
                 question.getQuiz().getQuizId(),
@@ -208,7 +231,8 @@ public class QuestionService {
                 question.getQuestionType(),
                 question.getAudioUrl(),
                 question.getImageUrl(),
-                question.getCorrectAnswerText()
+                question.getCorrectAnswerText(),
+                answers // MỚI: Truyền danh sách answers vào DTO
         );
     }
 }
